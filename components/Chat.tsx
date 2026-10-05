@@ -1,0 +1,102 @@
+'use client';
+
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport, type UIMessage } from 'ai';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { StoredMessage } from '@/lib/api-types';
+
+type Props = {
+  sessionId: string;
+  initialMessages: StoredMessage[];
+  provider: string;
+  model: string;
+  onTurnEnd: () => void;
+};
+
+/** Chat pane. Remounted (via `key`) whenever the session changes. */
+export function Chat({ sessionId, initialMessages, provider, model, onTurnEnd }: Props) {
+  // Keep the latest model choice in a ref so the transport (created once) always sends it.
+  const modelRef = useRef({ provider, model });
+  modelRef.current = { provider, model };
+
+  const compactedIds = useMemo(() => new Set(initialMessages.filter((m) => m.compacted).map((m) => m.id)), [initialMessages]);
+
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport<UIMessage>({
+        api: '/api/chat',
+        // Only send the newest message; the server rebuilds history from SQLite.
+        prepareSendMessagesRequest: ({ id, messages }) => ({
+          body: { sessionId: id, message: messages[messages.length - 1], ...modelRef.current },
+        }),
+      }),
+    [],
+  );
+
+  const { messages, sendMessage, status, error, stop } = useChat({
+    id: sessionId,
+    messages: initialMessages.map(({ id, role, parts }) => ({ id, role, parts })),
+    transport,
+    onFinish: onTurnEnd,
+    onError: onTurnEnd,
+  });
+
+  const [input, setInput] = useState('');
+  const bottom = useRef<HTMLDivElement>(null);
+  useEffect(() => bottom.current?.scrollIntoView({ behavior: 'smooth' }), [messages]);
+
+  const busy = status === 'submitted' || status === 'streaming';
+  const submit = () => {
+    if (!input.trim() || busy) return;
+    void sendMessage({ text: input });
+    setInput('');
+  };
+
+  return (
+    <div className="chat">
+      <div className="messages">
+        {messages.length === 0 && <p className="muted">Describe a goal, e.g. “Help me plan a 1-day team offsite.”</p>}
+        {messages.map((m) => (
+          <div key={m.id} className={`msg ${m.role} ${compactedIds.has(m.id) ? 'compacted' : ''}`}>
+            <div className="role">
+              {m.role}
+              {compactedIds.has(m.id) && ' · compacted (model sees summary only)'}
+            </div>
+            {m.parts.map((p, i) => <Part key={i} part={p} />)}
+          </div>
+        ))}
+        {busy && <p className="muted">Agent is working…</p>}
+        <div ref={bottom} />
+      </div>
+      {error && <div className="error">Error: {error.message}</div>}
+      <div className="composer">
+        <textarea
+          rows={2}
+          value={input}
+          placeholder="Message the agent (Enter to send, Shift+Enter for newline)"
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+        />
+        {busy ? <button onClick={() => void stop()}>Stop</button> : <button onClick={submit} disabled={!input.trim()}>Send</button>}
+      </div>
+    </div>
+  );
+}
+
+/** Render one message part: text as-is, tool calls as compact chips. */
+function Part({ part }: { part: UIMessage['parts'][number] }) {
+  if (part.type === 'text') return <div>{part.text}</div>;
+  if (part.type.startsWith('tool-') || part.type === 'dynamic-tool') {
+    const t = part as { type: string; toolName?: string; state?: string; errorText?: string; output?: unknown };
+    const name = t.toolName ?? t.type.replace(/^tool-/, '');
+    const failed = Boolean(t.errorText) || (typeof t.output === 'object' && t.output !== null && 'error' in t.output);
+    const icon = t.state === 'output-available' || t.state === 'output-error' ? (failed ? '✗' : '✓') : '…';
+    return <span className={`chip ${failed ? 'err' : ''}`}>🔧 {name} {icon}</span>;
+  }
+  return null;
+}
