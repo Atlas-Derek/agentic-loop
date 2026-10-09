@@ -28,9 +28,10 @@ const globalForMcp = globalThis as unknown as { __mcpClient?: Promise<Client> };
 
 async function connect(): Promise<Client> {
   const transport = new StdioClientTransport({
-    // Run the TypeScript server with the current Node binary + the tsx loader.
+    // Node 24 runs the TypeScript server directly (type stripping), so no loader or dev dependency is
+    // needed at runtime. Its imports use explicit `.ts` extensions for this reason.
     command: process.execPath,
-    args: ['--import', 'tsx', path.resolve(/*turbopackIgnore: true*/ process.cwd(), 'mcp-server/index.ts')],
+    args: ['--disable-warning=ExperimentalWarning', path.resolve(/*turbopackIgnore: true*/ process.cwd(), 'mcp-server/index.ts')],
     cwd: process.cwd(),
     env: serverEnv(),
     stderr: 'inherit', // server logs show up in the dev terminal

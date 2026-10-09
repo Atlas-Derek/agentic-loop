@@ -3,6 +3,7 @@
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Markdown from 'react-markdown';
 import type { StoredMessage } from '@/lib/api-types';
 
 type Props = {
@@ -66,7 +67,7 @@ export function Chat({ sessionId, initialMessages, provider, model, onTurnEnd }:
               {m.role}
               {compactedIds.has(m.id) && ' · compacted (model sees summary only)'}
             </div>
-            {m.parts.map((p, i) => <Part key={i} part={p} />)}
+            {m.parts.map((p, i) => <Part key={i} part={p} markdown={m.role === 'assistant'} />)}
           </div>
         ))}
         {busy && <p className="muted">Agent is working…</p>}
@@ -92,9 +93,14 @@ export function Chat({ sessionId, initialMessages, provider, model, onTurnEnd }:
   );
 }
 
-/** Render one message part: text as-is, tool calls as compact chips. */
-function Part({ part }: { part: UIMessage['parts'][number] }) {
-  if (part.type === 'text') return <div>{part.text}</div>;
+/**
+ * Render one message part: assistant text as markdown (react-markdown ignores raw HTML, so model output
+ * can't inject markup), user text as-is, tool calls as compact chips.
+ */
+function Part({ part, markdown }: { part: UIMessage['parts'][number]; markdown: boolean }) {
+  if (part.type === 'text') {
+    return markdown ? <div className="md"><Markdown>{part.text}</Markdown></div> : <div>{part.text}</div>;
+  }
   if (part.type.startsWith('tool-') || part.type === 'dynamic-tool') {
     const t = part as { type: string; toolName?: string; state?: string; errorText?: string; output?: unknown };
     const name = t.toolName ?? t.type.replace(/^tool-/, '');

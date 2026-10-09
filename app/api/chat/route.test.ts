@@ -45,6 +45,7 @@ const mockModel = new MockLanguageModelV4({
 
 vi.mock('@/lib/agent/model', () => ({
   getModel: () => mockModel,
+  getCompactionModel: () => mockModel,
   configuredProviders: () => ({ openai: true, google: true }),
 }));
 
@@ -52,6 +53,7 @@ const { POST } = await import('./route');
 const { getDb } = await import('@/lib/db');
 const repo = await import('@/lib/db/repo');
 const { getMcpClient } = await import('@/lib/mcp/client');
+const { waitForCompaction } = await import('@/lib/agent/compaction');
 
 let sessionId: string;
 
@@ -64,7 +66,7 @@ async function send(id: string, t: string): Promise<void> {
   const res = await post({ sessionId, provider: 'openai', model: 'gpt-5-mini', message: userMessage(id, t) });
   expect(res.status).toBe(200);
   await res.text(); // drain the stream so onEnd runs
-  await new Promise((r) => setTimeout(r, 50));
+  await waitForCompaction(sessionId); // compaction runs in the background after the response
 }
 
 beforeAll(() => {
@@ -76,7 +78,8 @@ afterAll(async () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-describe('POST /api/chat', () => {
+// The tests below are consecutive turns of one scripted conversation, so they must run in order.
+describe('POST /api/chat', { shuffle: false }, () => {
   it('calls an MCP tool, logs it, and persists the conversation', async () => {
     await send('u1', 'Help me plan an offsite');
     const db = getDb();

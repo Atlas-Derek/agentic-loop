@@ -25,6 +25,10 @@ Browser (app/page.tsx, useChat)
   `complete` is terminal: task/summary tools refuse to write, and a new goal needs a new session.
 - Trust boundary: `/api/chat` accepts only one plain-text user message (zod-validated); history comes from SQLite.
   The compaction summary is passed as a tagged context message, never in the system instructions.
+- `proxy.ts` guards every request: state-changing `/api/*` calls must be same-origin JSON; optional `APP_PASSWORD` adds HTTP Basic auth.
+- Compaction runs in the background after a turn using the provider's `summarizer` model (`lib/models.ts`);
+  the next turn awaits it (`waitForCompaction`).
+- Task status changes follow `TASK_TRANSITIONS` in `lib/db/repo.ts` (a `done` task can only be reopened as `in_progress`).
 
 ## Commands
 
@@ -36,7 +40,7 @@ Requires **Node 24** (`nvm use`); `better-sqlite3`'s prebuilt binary segfaults o
 - `npm run mcp:inspect` — open the MCP Inspector against the tool server
 - `npm run build`
 
-Env (`.env.local`): `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, optional `AGENT_DB_PATH`, `COMPACT_AFTER`, `KEEP_RECENT`.
+Env (`.env.local`): `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, optional `AGENT_DB_PATH`, `COMPACT_AFTER`, `KEEP_RECENT`, `APP_PASSWORD`.
 
 ## Conventions
 
@@ -47,6 +51,9 @@ Env (`.env.local`): `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, optional `
 - Server-only code (SQLite, MCP, provider SDKs) stays in `lib/db`, `lib/mcp`, `lib/agent`, `mcp-server`, and API routes.
   Client components may only import types and `lib/models.ts`.
 - The MCP server writes protocol on stdout: log to **stderr** only.
+- The MCP server runs directly on Node 24 (type stripping, no tsx). Everything it imports (`mcp-server/`, `lib/db/`,
+  `lib/mcp/schemas.ts`) must use relative value imports **with explicit `.ts` extensions** and only erasable TS syntax
+  (no enums, namespaces or parameter properties). The spawned server gets a minimal env (no API keys).
 - To add a tool: add it to `lib/mcp/schemas.ts`, implement it in `lib/db/repo.ts`, register it in `mcp-server/index.ts`.
   The AI SDK wrapper picks it up automatically.
 - Tests live next to the code as `*.test.ts`. Prefer dependency injection (pass a DB) over mocking globals.

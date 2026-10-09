@@ -1,6 +1,9 @@
 /**
  * Workflow MCP server (stdio transport).
  *
+ * Runs directly on Node 24 (built-in type stripping), so every relative import in this file and the
+ * modules it loads (lib/db, lib/mcp/schemas) must be a value import with an explicit `.ts` extension.
+ *
  * Launched as a child process by the Next.js backend (lib/mcp/client.ts),
  * or standalone for debugging:  npm run mcp:inspect
  *
@@ -9,9 +12,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { defaultDbPath, openDb } from '../lib/db/index';
-import * as repo from '../lib/db/repo';
-import { TOOL_DEFS, withSessionId } from '../lib/mcp/schemas';
+import { defaultDbPath, openDb } from '../lib/db/index.ts';
+import * as repo from '../lib/db/repo.ts';
+import { TOOL_DEFS, withSessionId } from '../lib/mcp/schemas.ts';
 
 const db = openDb(defaultDbPath());
 const server = new McpServer({ name: 'workflow-tools', version: '0.1.0' });

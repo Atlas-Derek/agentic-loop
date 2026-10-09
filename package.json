@@ -12,8 +12,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "mcp:server": "tsx mcp-server/index.ts",
-    "mcp:inspect": "npx @modelcontextprotocol/inspector npx tsx mcp-server/index.ts"
+    "mcp:server": "node --disable-warning=ExperimentalWarning mcp-server/index.ts",
+    "mcp:inspect": "npx @modelcontextprotocol/inspector node --disable-warning=ExperimentalWarning mcp-server/index.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.87",
@@ -25,6 +25,7 @@
     "next": "^16.3.8",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "react-markdown": "^10.1.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
@@ -36,7 +37,6 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "jsdom": "^29.1.1",
-    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"
   }

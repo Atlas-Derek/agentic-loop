@@ -76,6 +76,15 @@ describe('tasks and workflow state', () => {
     expect(() => repo.updateTaskStatus(db, sessionId, t.id, 'done')).toThrow(/not found/);
   });
 
+  it('enforces task status transitions', () => {
+    const t = repo.createTask(db, sessionId, { title: 'Step' });
+    repo.updateTaskStatus(db, sessionId, t.id, 'done'); // pending -> done (skipping in_progress) is allowed
+    repo.updateTaskStatus(db, sessionId, t.id, 'done', 'note only'); // same status updates the note
+    expect(() => repo.updateTaskStatus(db, sessionId, t.id, 'pending')).toThrow(/cannot go from done to pending. Allowed: in_progress/);
+    expect(() => repo.updateTaskStatus(db, sessionId, t.id, 'blocked')).toThrow(/cannot go from done to blocked/);
+    expect(repo.updateTaskStatus(db, sessionId, t.id, 'in_progress').status).toBe('in_progress'); // reopen
+  });
+
   it('treats a completed workflow as read-only', () => {
     const t = repo.createTask(db, sessionId, { title: 'Only step' });
     repo.updateTaskStatus(db, sessionId, t.id, 'done');

@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
-import { SCHEMA } from './schema';
+import { SCHEMA } from './schema.ts';
 
 export type DB = Database.Database;
 

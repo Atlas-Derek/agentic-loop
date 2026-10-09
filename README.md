@@ -27,7 +27,9 @@ The SQLite file is created at `data/agent.db`. Delete it to start fresh.
 7. After ~12 messages, older ones are compacted (dimmed in chat, summary shown under **Compaction**). Originals stay in the DB.
 8. When all tasks are done the agent calls `saveSummary`; the phase flips to **complete** and the final summary appears. A completed session is read-only; start a new session for a new goal.
 
-Set `COMPACT_AFTER=6` in `.env.local` to see compaction sooner.
+Set `COMPACT_AFTER=6` in `.env.local` to see compaction sooner. Compaction uses the provider's cheap model (GPT-5 mini / Gemini Flash) and runs in the background, so it appears in the panel shortly after the turn ends.
+
+**Access.** API writes must be same-origin JSON. To put the app behind a password (e.g. on a shared machine or server), set `APP_PASSWORD` in `.env.local`; the browser will prompt for it (any username).
 
 ## How it works
 

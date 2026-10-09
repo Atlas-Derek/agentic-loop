@@ -29,7 +29,7 @@ const sessionState: SessionState = {
 };
 
 let created = false;
-const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+const defaultFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const url = String(input);
   const method = init?.method ?? 'GET';
   if (url === '/api/sessions' && method === 'POST') {
@@ -40,11 +40,12 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Pr
   if (url === '/api/memories') return Response.json([]);
   if (url === `/api/sessions/${session.id}`) return Response.json(sessionState);
   return Response.json({ error: `unexpected ${method} ${url}` }, { status: 500 });
-});
+};
+const fetchMock = vi.fn(defaultFetch);
 
 beforeEach(() => {
   created = false;
-  fetchMock.mockClear();
+  fetchMock.mockReset().mockImplementation(defaultFetch);
   vi.stubGlobal('fetch', fetchMock);
   window.history.replaceState(null, '', '/');
   // jsdom does not implement scrollIntoView. Current Chrome returns a Promise from it, which is what
@@ -89,4 +90,39 @@ describe('Home', () => {
     consoleError.mockRestore();
   });
 
+  it('shows an error banner when creating a session fails, instead of an unhandled rejection', async () => {
+    fetchMock.mockImplementationOnce(async () => Response.json({ sessions: [], providers: { openai: true, google: false } }));
+    render(<Home />);
+    fetchMock.mockImplementationOnce(async () => new Response('db locked', { status: 500 }));
+
+    await userEvent.click(screen.getByRole('button', { name: '+ New session' }));
+
+    await waitFor(() => expect(screen.getByText(/POST \/api\/sessions failed: 500 db locked/)).toBeTruthy());
+    expect(screen.getByText('Create or select a session to start.')).toBeTruthy();
+  });
+
+  it('renders assistant replies as markdown but keeps user text and raw HTML literal', async () => {
+    window.history.replaceState(null, '', `/?s=${session.id}`);
+    const withMessages: SessionState = {
+      ...sessionState,
+      messages: [
+        { id: 'u1', seq: 1, role: 'user', parts: [{ type: 'text', text: 'I said **this**' }], compacted: false, createdAt: 'x' },
+        { id: 'a1', seq: 2, role: 'assistant', parts: [{ type: 'text', text: '**Plan**\n\n- Venue\n- Agenda <img src=x onerror=alert(1)>' }], compacted: false, createdAt: 'x' },
+      ],
+    };
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) =>
+      String(input) === `/api/sessions/${session.id}`
+        ? Response.json(withMessages)
+        : String(input) === '/api/memories'
+          ? Response.json([])
+          : Response.json({ sessions: [session], providers: { openai: true, google: false } }),
+    );
+
+    const { container } = render(<Home />);
+
+    await waitFor(() => expect(container.querySelector('.msg.assistant strong')?.textContent).toBe('Plan'));
+    expect(container.querySelectorAll('.msg.assistant li')).toHaveLength(2);
+    expect(container.querySelector('img')).toBeNull();
+    expect(screen.getByText('I said **this**')).toBeTruthy();
+  });
 });

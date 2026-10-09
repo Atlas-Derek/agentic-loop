@@ -222,9 +222,26 @@ export function listTasks(db: DB, sessionId: string): Task[] {
   return (db.prepare('SELECT * FROM tasks WHERE session_id = ? ORDER BY position').all(sessionId) as TaskRow[]).map(toTask);
 }
 
+/**
+ * Allowed status changes. Setting the same status again is always allowed (e.g. to update the note).
+ * Skipping in_progress is allowed so the model can batch quick steps. A done step can only be
+ * reopened as in_progress, so finished work never silently drops back to pending/blocked.
+ */
+const TASK_TRANSITIONS: Record<TaskStatus, readonly TaskStatus[]> = {
+  pending: ['in_progress', 'done', 'blocked'],
+  in_progress: ['pending', 'done', 'blocked'],
+  blocked: ['pending', 'in_progress', 'done'],
+  done: ['in_progress'],
+};
+
 export function updateTaskStatus(db: DB, sessionId: string, taskId: number, status: TaskStatus, note?: string): Task {
-  getTask(db, sessionId, taskId); // throws if missing
+  const task = getTask(db, sessionId, taskId); // throws if missing
   assertNotComplete(db, sessionId);
+  if (task.status !== status && !TASK_TRANSITIONS[task.status].includes(status)) {
+    throw new AgentError(
+      `Task ${taskId} cannot go from ${task.status} to ${status}. Allowed: ${TASK_TRANSITIONS[task.status].join(', ')}.`,
+    );
+  }
   db.prepare('UPDATE tasks SET status = ?, note = COALESCE(?, note), updated_at = ? WHERE id = ?').run(status, note ?? null, now(), taskId);
   return getTask(db, sessionId, taskId);
 }

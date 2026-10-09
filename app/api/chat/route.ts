@@ -10,11 +10,11 @@ import { convertToModelMessages, createIdGenerator, stepCountIs, streamText, typ
 import { z } from 'zod';
 import { getDb } from '@/lib/db';
 import * as repo from '@/lib/db/repo';
-import { getModel } from '@/lib/agent/model';
+import { getCompactionModel, getModel } from '@/lib/agent/model';
 import { buildInstructions, buildSummaryMessages } from '@/lib/agent/prompt';
 import { limitFinalStep } from '@/lib/agent/steps';
 import { buildWorkflowTools } from '@/lib/agent/tools';
-import { maybeCompact } from '@/lib/agent/compaction';
+import { scheduleCompaction, waitForCompaction } from '@/lib/agent/compaction';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -53,21 +53,27 @@ export async function POST(req: Request): Promise<Response> {
   const db = getDb();
 
   let model;
+  let compactionModel;
   let session;
   try {
     session = repo.requireSession(db, body.sessionId);
     model = getModel(body.provider, body.model);
+    compactionModel = getCompactionModel(body.provider);
   } catch (err) {
     return badRequest(err instanceof Error ? err.message : String(err));
   }
   // Message ids are client-generated; never let a request overwrite stored history.
   if (repo.messageExists(db, body.message.id)) return badRequest(`Message ${body.message.id} already exists`, 409);
 
-  // Remember the model choice (switching mid-session is allowed) and title new sessions.
+  // If the previous turn kicked off compaction, let it finish so context isn't built mid-compaction.
+  await waitForCompaction(session.id);
+
+  // Remember the model choice (switching mid-session is allowed) and title the session from its first message.
+  const isFirstMessage = repo.getMessages(db, session.id, { includeCompacted: true }).length === 0;
   repo.updateSession(db, session.id, {
     provider: body.provider,
     model: body.model,
-    title: session.title === 'New session' ? body.message.parts[0].text.slice(0, 60) : undefined,
+    title: isFirstMessage ? body.message.parts[0].text.slice(0, 60) : undefined,
   });
 
   repo.upsertMessages(db, session.id, [body.message]);
@@ -102,15 +108,9 @@ export async function POST(req: Request): Promise<Response> {
       // Skip empty assistant messages (e.g. the model call failed before producing anything).
       // Partial turns are still saved so the user sees what happened before they stopped.
       repo.upsertMessages(db, session.id, messages.filter((m) => m.parts.length > 0));
-      // Don't spend a model call summarising a turn the user abandoned.
-      if (isAborted || isCancelled) return;
-      try {
-        const summary = await maybeCompact(db, session.id, model);
-        if (summary) console.log(`[compaction] session ${session.id} compacted through seq ${summary.coversThroughSeq}`);
-      } catch (err) {
-        // Compaction is best-effort; the conversation still works without it.
-        console.error('[compaction] failed:', err);
-      }
+      // Don't spend a model call summarising a turn the user abandoned. Otherwise compact in the
+      // background with the provider's cheap model, so the response closes without waiting for it.
+      if (!isAborted && !isCancelled) scheduleCompaction(db, session.id, compactionModel);
     },
   });
 }

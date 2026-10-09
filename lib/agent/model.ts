@@ -3,7 +3,7 @@ import { google } from '@ai-sdk/google';
 import type { LanguageModel } from 'ai';
 import type { Provider } from '../db/repo';
 import { AgentError } from '../db/repo';
-import { findModel } from '../models';
+import { MODELS, findModel } from '../models';
 
 /** Which providers have an API key configured (used to disable options in the UI). */
 export function configuredProviders(): Record<Provider, boolean> {
@@ -17,4 +17,11 @@ export function getModel(provider: Provider, modelId: string): LanguageModel {
   if (!findModel(provider, modelId)) throw new AgentError(`Unknown model ${provider}/${modelId}`);
   if (!configuredProviders()[provider]) throw new AgentError(`No API key configured for ${provider}`);
   return provider === 'openai' ? openai(modelId) : google(modelId);
+}
+
+/** The provider's cheap model for compaction; summarising doesn't need the session's (possibly large) chat model. */
+export function getCompactionModel(provider: Provider): LanguageModel {
+  const option = MODELS.find((m) => m.provider === provider && m.summarizer);
+  if (!option) throw new AgentError(`No summarizer model registered for ${provider}`);
+  return getModel(provider, option.id);
 }

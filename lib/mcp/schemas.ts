@@ -6,7 +6,7 @@
  * so the model never has to know or guess session IDs.
  */
 import { z } from 'zod';
-import { TASK_STATUSES } from '../db/repo';
+import { TASK_STATUSES } from '../db/repo.ts';
 
 export const TOOL_DEFS = {
   createTask: {

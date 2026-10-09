@@ -49,23 +49,36 @@ export default function Home() {
     if (fromUrl) void selectSession(fromUrl);
   }, [refreshList, refreshMemories, selectSession]);
 
-  const newSession = async () => {
-    const body = state ? { provider: state.session.provider, model: state.session.model } : {};
-    const s = await getJson<{ id: string }>('/api/sessions', { method: 'POST', body: JSON.stringify(body) });
-    await refreshList();
-    await selectSession(s.id);
+  /** Run a UI action and show any failure in the error banner instead of an unhandled rejection. */
+  const run = async (action: () => Promise<void>) => {
+    try {
+      setLoadError(null);
+      await action();
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : String(err));
+    }
   };
 
-  const changeModel = async (provider: Provider, model: string) => {
-    if (!activeId) return;
-    await getJson(`/api/sessions/${activeId}`, { method: 'PATCH', body: JSON.stringify({ provider, model }) });
-    await refreshSession(activeId);
-  };
+  const newSession = () =>
+    run(async () => {
+      const body = state ? { provider: state.session.provider, model: state.session.model } : {};
+      const s = await getJson<{ id: string }>('/api/sessions', { method: 'POST', body: JSON.stringify(body) });
+      await refreshList();
+      await selectSession(s.id);
+    });
 
-  const setMemoryStatus = async (id: number, status: Memory['status']) => {
-    await getJson(`/api/memories/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
-    await refreshMemories();
-  };
+  const changeModel = (provider: Provider, model: string) =>
+    run(async () => {
+      if (!activeId) return;
+      await getJson(`/api/sessions/${activeId}`, { method: 'PATCH', body: JSON.stringify({ provider, model }) });
+      await refreshSession(activeId);
+    });
+
+  const setMemoryStatus = (id: number, status: Memory['status']) =>
+    run(async () => {
+      await getJson(`/api/memories/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+      await refreshMemories();
+    });
 
   // After every agent turn, pull fresh workflow / tool log / memory state from the server.
   const onTurnEnd = useCallback(() => {

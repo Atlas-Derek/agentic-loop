@@ -4,12 +4,13 @@
  */
 import type { Provider } from './db/repo';
 
-export type ModelOption = { provider: Provider; id: string; label: string };
+/** `summarizer`: the provider's cheap/fast model, used for background compaction. One per provider. */
+export type ModelOption = { provider: Provider; id: string; label: string; summarizer?: true };
 
 export const MODELS: ModelOption[] = [
-  { provider: 'openai', id: 'gpt-5-mini', label: 'OpenAI · GPT-5 mini' },
+  { provider: 'openai', id: 'gpt-5-mini', label: 'OpenAI · GPT-5 mini', summarizer: true },
   { provider: 'openai', id: 'gpt-5', label: 'OpenAI · GPT-5' },
-  { provider: 'google', id: 'gemini-3.8-flash', label: 'Google · Gemini 3.8 Flash' },
+  { provider: 'google', id: 'gemini-3.8-flash', label: 'Google · Gemini 3.8 Flash', summarizer: true },
   { provider: 'google', id: 'gemini-pro-latest', label: 'Google · Gemini Pro (latest)' },
 ];
 

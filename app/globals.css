@@ -17,6 +17,10 @@ h3:first-child { margin-top: 0; }
 .msg { margin-bottom: 12px; padding: 8px 12px; border-radius: 8px; background: #fff; border: 1px solid #e5e5ea; white-space: pre-wrap; }
 .msg.user { background: #eaf3ff; border-color: #cfe3ff; }
 .msg.compacted { opacity: .45; }
+.md { white-space: normal; }
+.md > :first-child { margin-top: 0; } .md > :last-child { margin-bottom: 0; }
+.md p, .md ul, .md ol { margin: 6px 0; } .md ul, .md ol { padding-left: 20px; }
+.md pre { white-space: pre-wrap; background: #f7f7f9; padding: 6px 8px; border-radius: 4px; }
 .role { font-size: 11px; font-weight: 600; color: #6e6e73; margin-bottom: 2px; }
 .chip { display: inline-block; font: 12px ui-monospace, monospace; padding: 1px 6px; margin: 2px 4px 2px 0; border-radius: 4px; background: #f0f0f2; }
 .chip.err { background: #ffe5e5; }

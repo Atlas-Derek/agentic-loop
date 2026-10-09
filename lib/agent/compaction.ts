@@ -5,6 +5,9 @@
  * are summarised by the model into a rolling summary, flagged `compacted` in the DB
  * (kept for debugging), and replaced in future prompts by that summary.
  * The most recent KEEP_RECENT (or slightly more) messages stay verbatim.
+ *
+ * It runs in the background after a turn (scheduleCompaction) so the user doesn't wait for it;
+ * the next turn calls waitForCompaction first so it never builds context mid-compaction.
  */
 import { generateText, type LanguageModel, type UIMessage } from 'ai';
 import type { DB } from '../db/index';
@@ -91,4 +94,30 @@ export async function maybeCompact(db: DB, sessionId: string, model: LanguageMod
   const summary = repo.addSummary(db, sessionId, 'compaction', text, throughSeq);
   repo.markCompacted(db, sessionId, throughSeq);
   return summary;
+}
+
+// One in-flight compaction per session, cached on globalThis so Next dev hot reloads share it.
+const globalForCompaction = globalThis as unknown as { __compactions?: Map<string, Promise<void>> };
+const inFlight = (globalForCompaction.__compactions ??= new Map());
+
+/** Start compaction for a session in the background (no-op if one is already running). Never throws. */
+export function scheduleCompaction(db: DB, sessionId: string, model: LanguageModel): void {
+  if (inFlight.has(sessionId)) return;
+  const job = (async () => {
+    try {
+      const summary = await maybeCompact(db, sessionId, model);
+      if (summary) console.log(`[compaction] session ${sessionId} compacted through seq ${summary.coversThroughSeq}`);
+    } catch (err) {
+      // Compaction is best-effort; the conversation still works without it.
+      console.error('[compaction] failed:', err);
+    } finally {
+      inFlight.delete(sessionId);
+    }
+  })();
+  inFlight.set(sessionId, job);
+}
+
+/** Resolve once any in-flight compaction for this session has finished. */
+export async function waitForCompaction(sessionId: string): Promise<void> {
+  await inFlight.get(sessionId);
 }
