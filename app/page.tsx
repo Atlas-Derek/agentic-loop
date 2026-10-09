@@ -82,6 +82,12 @@ export default function Home() {
       await refreshList();
     });
 
+  const renameSession = (id: string, title: string) =>
+    run(async () => {
+      await getJson(`/api/sessions/${id}`, { method: 'PATCH', body: JSON.stringify({ title }) });
+      await refreshList();
+    });
+
   const changeModel = (provider: Provider, model: string) =>
     run(async () => {
       if (!activeId) return;
@@ -117,6 +123,7 @@ export default function Home() {
           onSelect={(id) => void selectSession(id)}
           onNew={() => void newSession()}
           onDelete={(s) => void deleteSession(s.id, s.title)}
+          onRename={(s, title) => void renameSession(s.id, title)}
         />
         {state && (
           <ModelSelector provider={state.session.provider} model={state.session.model} available={list.providers} onChange={(p, m) => void changeModel(p, m)} />

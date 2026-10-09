@@ -3,9 +3,11 @@
  * which both open the same database file.
  */
 export const SCHEMA = `
+-- title_custom = 1 once the user names the session; automatic titling then leaves it alone.
 CREATE TABLE IF NOT EXISTS sessions (
-  id          TEXT PRIMARY KEY,
-  title       TEXT NOT NULL,
+  id           TEXT PRIMARY KEY,
+  title        TEXT NOT NULL,
+  title_custom INTEGER NOT NULL DEFAULT 0,
   provider    TEXT NOT NULL,
   model       TEXT NOT NULL,
   created_at  TEXT NOT NULL,

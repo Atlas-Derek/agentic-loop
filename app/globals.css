@@ -139,9 +139,19 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .session .muted { font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
 .session:hover:not(:disabled) { background: var(--surface-2); }
 .session.active { background: var(--accent-soft); color: var(--accent-text); box-shadow: inset 3px 0 0 var(--accent); }
-.session-delete { flex: none; width: 28px; padding: 0; border-color: transparent; background: transparent; color: var(--muted); opacity: 0.5; font-size: 16px; }
-.session-row:hover .session-delete, .session-delete:focus-visible { opacity: 1; }
+/* Rename (pencil) and delete (×): faint until the row is hovered or the button is focused. */
+.session-action {
+  flex: none; display: grid; place-items: center; width: 26px; padding: 0;
+  border-color: transparent; background: transparent; color: var(--muted); opacity: 0.5; font-size: 16px;
+}
+.session-row:hover .session-action, .session-action:focus-visible { opacity: 1; }
+.session-action:hover:not(:disabled) { color: var(--text); background: var(--surface-2); }
 .session-delete:hover:not(:disabled) { color: var(--danger); background: var(--danger-soft); }
+.session-rename {
+  flex: 1; min-width: 0; padding: 7px 10px; font-weight: 500;
+  border: 1px solid var(--accent); border-radius: 10px; background: var(--surface); box-shadow: var(--ring);
+}
+.session-rename:focus { outline: none; }
 .model-select {
   /* Native arrow hugs the right edge; replace it with a chevron inset 12px. */
   appearance: none;

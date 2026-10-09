@@ -1,6 +1,8 @@
 'use client';
 
+import { useRef, useState } from 'react';
 import type { Memory, Provider, Session, SessionState } from '@/lib/api-types';
+import { MAX_TITLE_LENGTH } from '@/lib/limits';
 import { MODELS } from '@/lib/models';
 
 // ---------------------------------------------------------------- left column
@@ -11,24 +13,82 @@ export function SessionList(props: {
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete: (session: Session) => void;
+  onRename: (session: Session, title: string) => void;
 }) {
+  const [editingId, setEditingId] = useState<string | null>(null);
   return (
     <>
       <h3>Sessions</h3>
       <button onClick={props.onNew} className="btn-primary new-session">+ New session</button>
       {props.sessions.map((s) => (
-        // Two sibling buttons (a button can't contain another button).
+        // Sibling buttons (a button can't contain another button).
         <div key={s.id} className="session-row">
-          <button className={`session ${s.id === props.activeId ? 'active' : ''}`} onClick={() => props.onSelect(s.id)} title={s.id}>
-            {s.title}
-            <div className="muted">{s.model} · {new Date(s.updatedAt).toLocaleString()}</div>
+          {editingId === s.id ? (
+            <RenameInput
+              initial={s.title}
+              onDone={(title) => {
+                setEditingId(null);
+                if (title !== null && title !== s.title) props.onRename(s, title);
+              }}
+            />
+          ) : (
+            <button
+              className={`session ${s.id === props.activeId ? 'active' : ''}`}
+              onClick={() => props.onSelect(s.id)}
+              onDoubleClick={() => setEditingId(s.id)}
+              title={`${s.title} (double-click to rename)`}
+            >
+              {s.title}
+              <div className="muted">{s.model} · {new Date(s.updatedAt).toLocaleString()}</div>
+            </button>
+          )}
+          <button className="session-action" onClick={() => setEditingId(s.id)} aria-label={`Rename session ${s.title}`} title="Rename session">
+            <PencilIcon />
           </button>
-          <button className="session-delete" onClick={() => props.onDelete(s)} aria-label={`Delete session ${s.title}`} title="Delete session">
+          <button className="session-action session-delete" onClick={() => props.onDelete(s)} aria-label={`Delete session ${s.title}`} title="Delete session">
             ×
           </button>
         </div>
       ))}
     </>
+  );
+}
+
+/**
+ * Inline name editor. Enter or clicking away saves, Escape cancels. Calls onDone exactly once:
+ * with the trimmed name, or null to cancel (also for an empty name, which keeps the old one).
+ */
+function RenameInput({ initial, onDone }: { initial: string; onDone: (title: string | null) => void }) {
+  const finished = useRef(false);
+  const finish = (title: string | null) => {
+    // Enter/Escape unmount the input, which can also fire blur; only act on the first event.
+    if (finished.current) return;
+    finished.current = true;
+    onDone(title === null || title.trim() === '' ? null : title.trim());
+  };
+  return (
+    <input
+      className="session-rename"
+      aria-label="Session name"
+      defaultValue={initial}
+      maxLength={MAX_TITLE_LENGTH}
+      autoFocus
+      onFocus={(e) => e.currentTarget.select()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') finish(e.currentTarget.value);
+        if (e.key === 'Escape') finish(null);
+      }}
+      onBlur={(e) => finish(e.currentTarget.value)}
+    />
+  );
+}
+
+function PencilIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
   );
 }
 

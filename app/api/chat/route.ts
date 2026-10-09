@@ -68,12 +68,13 @@ export async function POST(req: Request): Promise<Response> {
   // If the previous turn kicked off compaction, let it finish so context isn't built mid-compaction.
   await waitForCompaction(session.id);
 
-  // Remember the model choice (switching mid-session is allowed) and title the session from its first message.
+  // Remember the model choice (switching mid-session is allowed) and title the session from its first
+  // message, unless the user has already named it.
   const isFirstMessage = repo.getMessages(db, session.id, { includeCompacted: true }).length === 0;
   repo.updateSession(db, session.id, {
     provider: body.provider,
     model: body.model,
-    title: isFirstMessage ? body.message.parts[0].text.slice(0, 60) : undefined,
+    autoTitle: isFirstMessage ? body.message.parts[0].text.slice(0, 60) : undefined,
   });
 
   repo.upsertMessages(db, session.id, [body.message]);

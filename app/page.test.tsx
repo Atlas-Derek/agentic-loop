@@ -13,6 +13,7 @@ import Home from './page';
 const session: Session = {
   id: 'sess-1',
   title: 'New session',
+  customTitle: false,
   provider: 'openai',
   model: 'gpt-5-mini',
   createdAt: '2026-10-09T00:00:00.000Z',
@@ -29,6 +30,7 @@ const sessionState: SessionState = {
 };
 
 let created = false;
+let currentTitle = session.title;
 const defaultFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const url = String(input);
   const method = init?.method ?? 'GET';
@@ -36,11 +38,17 @@ const defaultFetch = async (input: RequestInfo | URL, init?: RequestInit): Promi
     created = true;
     return Response.json(session);
   }
-  if (url === '/api/sessions') return Response.json({ sessions: created ? [session] : [], providers: { openai: true, google: false } });
+  if (url === '/api/sessions') {
+    return Response.json({ sessions: created ? [{ ...session, title: currentTitle }] : [], providers: { openai: true, google: false } });
+  }
   if (url === '/api/memories') return Response.json([]);
   if (url === `/api/sessions/${session.id}` && method === 'DELETE') {
     created = false;
     return Response.json({ deleted: true, id: session.id });
+  }
+  if (url === `/api/sessions/${session.id}` && method === 'PATCH') {
+    currentTitle = (JSON.parse(String(init?.body)) as { title: string }).title;
+    return Response.json({ ...session, title: currentTitle, customTitle: true });
   }
   if (url === `/api/sessions/${session.id}`) return Response.json(sessionState);
   return Response.json({ error: `unexpected ${method} ${url}` }, { status: 500 });
@@ -49,6 +57,7 @@ const fetchMock = vi.fn(defaultFetch);
 
 beforeEach(() => {
   created = false;
+  currentTitle = session.title;
   fetchMock.mockReset().mockImplementation(defaultFetch);
   vi.stubGlobal('fetch', fetchMock);
   window.history.replaceState(null, '', '/');
@@ -120,6 +129,58 @@ describe('Home', () => {
 
     expect(fetchMock).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ method: 'DELETE' }));
     expect(screen.getByPlaceholderText(/Message the agent/)).toBeTruthy();
+  });
+
+  describe('renaming a session', () => {
+    const patchCalls = () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'PATCH');
+    const openSession = async () => {
+      render(<Home />);
+      await userEvent.click(screen.getByRole('button', { name: '+ New session' }));
+      await waitFor(() => expect(screen.getByPlaceholderText(/Message the agent/)).toBeTruthy());
+    };
+
+    it('saves a new name with the pencil button and Enter', async () => {
+      await openSession();
+      await userEvent.click(screen.getByRole('button', { name: 'Rename session New session' }));
+      const input = screen.getByRole('textbox', { name: 'Session name' });
+      expect(document.activeElement).toBe(input);
+
+      await userEvent.clear(input);
+      await userEvent.type(input, '  Offsite planning  {Enter}');
+
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Rename session Offsite planning' })).toBeTruthy());
+      expect(patchCalls()).toEqual([[`/api/sessions/${session.id}`, expect.objectContaining({ body: JSON.stringify({ title: 'Offsite planning' }) })]]);
+      expect(screen.queryByRole('textbox', { name: 'Session name' })).toBeNull();
+    });
+
+    it('starts editing on double-click and saves on blur', async () => {
+      await openSession();
+      await userEvent.dblClick(screen.getByRole('button', { name: /^New session gpt-5-mini/ }));
+      const input = screen.getByRole('textbox', { name: 'Session name' });
+      await userEvent.clear(input);
+      await userEvent.type(input, 'Q3 launch');
+
+      await userEvent.tab(); // focus leaves the input
+
+      await waitFor(() => expect(patchCalls()).toHaveLength(1));
+      expect(patchCalls()[0][1]).toMatchObject({ body: JSON.stringify({ title: 'Q3 launch' }) });
+    });
+
+    it('cancels on Escape, and does nothing for an empty or unchanged name', async () => {
+      await openSession();
+      const rename = () => userEvent.click(screen.getByRole('button', { name: 'Rename session New session' }));
+
+      await rename();
+      await userEvent.type(screen.getByRole('textbox', { name: 'Session name' }), 'Something{Escape}');
+      await rename();
+      await userEvent.clear(screen.getByRole('textbox', { name: 'Session name' }));
+      await userEvent.type(screen.getByRole('textbox', { name: 'Session name' }), '   {Enter}');
+      await rename();
+      await userEvent.type(screen.getByRole('textbox', { name: 'Session name' }), '{Enter}');
+
+      expect(patchCalls()).toEqual([]);
+      expect(screen.getByRole('button', { name: 'Rename session New session' })).toBeTruthy();
+    });
   });
 
   it('shows an error banner when creating a session fails, instead of an unhandled rejection', async () => {

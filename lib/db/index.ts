@@ -14,7 +14,22 @@ export function openDb(file: string): DB {
   db.pragma('busy_timeout = 5000');
   db.pragma('foreign_keys = ON');
   db.exec(SCHEMA);
+  migrate(db);
   return db;
+}
+
+/**
+ * Bring databases created by older versions up to date (CREATE TABLE IF NOT EXISTS won't add columns).
+ * IMMEDIATE takes the write lock before checking, so the Next.js server and the MCP server can both
+ * open the same file at startup without racing to add the same column.
+ */
+function migrate(db: DB): void {
+  db.transaction(() => {
+    const columns = db.prepare('PRAGMA table_info(sessions)').all() as { name: string }[];
+    if (!columns.some((c) => c.name === 'title_custom')) {
+      db.exec('ALTER TABLE sessions ADD COLUMN title_custom INTEGER NOT NULL DEFAULT 0');
+    }
+  }).immediate();
 }
 
 export function defaultDbPath(): string {

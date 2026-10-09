@@ -28,6 +28,8 @@ Browser (app/page.tsx, useChat)
 - `proxy.ts` guards every request: state-changing `/api/*` calls must be same-origin JSON; optional `APP_PASSWORD` adds HTTP Basic auth.
 - Compaction runs in the background after a turn using the provider's `summarizer` model (`lib/models.ts`);
   the next turn awaits it (`waitForCompaction`).
+- Schema changes to existing tables need a step in `migrate()` (`lib/db/index.ts`); `CREATE TABLE IF NOT EXISTS`
+  won't add columns to databases that already exist. A running dev server keeps its DB handle, so restart it after a migration.
 - Task status changes follow `TASK_TRANSITIONS` in `lib/db/repo.ts` (a `done` task can only be reopened as `in_progress`).
 
 ## Commands
@@ -49,7 +51,8 @@ Env (`.env.local`): `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, optional `
 - No silent failures: tool errors are returned to the model **and** logged to `tool_calls` with `success = 0`.
   Domain errors throw `AgentError` (lib/db/repo.ts).
 - Server-only code (SQLite, MCP, provider SDKs) stays in `lib/db`, `lib/mcp`, `lib/agent`, `mcp-server`, and API routes.
-  Client components may only import types and `lib/models.ts`.
+  Client components may only import types and the client-safe modules `lib/models.ts`, `lib/theme.ts`,
+  `lib/layout.ts` and `lib/limits.ts` (no server imports in those).
 - The MCP server writes protocol on stdout: log to **stderr** only.
 - The MCP server runs directly on Node 24 (type stripping, no tsx). Everything it imports (`mcp-server/`, `lib/db/`,
   `lib/mcp/schemas.ts`) must use relative value imports **with explicit `.ts` extensions** and only erasable TS syntax

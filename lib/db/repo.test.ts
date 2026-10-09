@@ -40,6 +40,23 @@ describe('sessions', () => {
     expect(() => repo.deleteSession(db, sessionId)).toThrow(repo.AgentError);
   });
 
+  it('renames a session without reordering the list, and validates the name', () => {
+    const before = repo.requireSession(db, sessionId);
+    const renamed = repo.renameSession(db, sessionId, '  Offsite planning  ');
+    expect(renamed).toMatchObject({ title: 'Offsite planning', customTitle: true, updatedAt: before.updatedAt });
+
+    expect(() => repo.renameSession(db, sessionId, '   ')).toThrow(/cannot be empty/);
+    expect(() => repo.renameSession(db, sessionId, 'x'.repeat(81))).toThrow(/at most 80/);
+    expect(() => repo.renameSession(db, 'nope', 'Name')).toThrow(/not found/);
+    expect(repo.requireSession(db, sessionId).title).toBe('Offsite planning');
+  });
+
+  it('applies automatic titles only until the user names the session', () => {
+    expect(repo.updateSession(db, sessionId, { autoTitle: 'From first message' })).toMatchObject({ title: 'From first message', customTitle: false });
+    repo.renameSession(db, sessionId, 'My name');
+    expect(repo.updateSession(db, sessionId, { autoTitle: 'Another message', model: 'gpt-5' })).toMatchObject({ title: 'My name', model: 'gpt-5' });
+  });
+
   it('throws for a missing session', () => {
     expect(() => repo.requireSession(db, 'nope')).toThrow(repo.AgentError);
   });

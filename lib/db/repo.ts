@@ -5,6 +5,7 @@
 import { randomUUID } from 'node:crypto';
 import type { UIMessage } from 'ai';
 import type { DB } from './index';
+import { MAX_TITLE_LENGTH } from '../limits.ts';
 
 export class AgentError extends Error {
   constructor(message: string) {
@@ -26,6 +27,8 @@ export type WorkflowPhase = 'clarifying' | 'executing' | 'complete';
 export type Session = {
   id: string;
   title: string;
+  /** True once the user has named the session; automatic titling then leaves it alone. */
+  customTitle: boolean;
   provider: Provider;
   model: string;
   createdAt: string;
@@ -86,7 +89,7 @@ export type WorkflowState = {
 };
 
 // Raw row shapes as SQLite returns them.
-type SessionRow = { id: string; title: string; provider: Provider; model: string; created_at: string; updated_at: string };
+type SessionRow = { id: string; title: string; title_custom: number; provider: Provider; model: string; created_at: string; updated_at: string };
 type MessageRow = { id: string; seq: number; role: UIMessage['role']; parts_json: string; compacted: number; created_at: string };
 type TaskRow = { id: number; position: number; title: string; description: string | null; status: TaskStatus; note: string | null; updated_at: string };
 type ToolCallRow = { id: number; tool_name: string; input_json: string; output_json: string | null; success: number; error: string | null; duration_ms: number; created_at: string };
@@ -94,7 +97,7 @@ type SummaryRow = { id: number; kind: 'compaction' | 'final'; content: string; c
 type MemoryRow = { id: number; content: string; reason: string | null; status: MemoryStatus; source_session_id: string | null; created_at: string };
 
 const toSession = (r: SessionRow): Session => ({
-  id: r.id, title: r.title, provider: r.provider, model: r.model, createdAt: r.created_at, updatedAt: r.updated_at,
+  id: r.id, title: r.title, customTitle: r.title_custom === 1, provider: r.provider, model: r.model, createdAt: r.created_at, updatedAt: r.updated_at,
 });
 const toTask = (r: TaskRow): Task => ({
   id: r.id, position: r.position, title: r.title, description: r.description, status: r.status, note: r.note, updatedAt: r.updated_at,
@@ -111,6 +114,7 @@ export function createSession(db: DB, input: { provider: Provider; model: string
   const row: SessionRow = {
     id: randomUUID(),
     title: input.title ?? 'New session',
+    title_custom: 0,
     provider: input.provider,
     model: input.model,
     created_at: ts,
@@ -137,11 +141,29 @@ export function listSessions(db: DB): Session[] {
   return (db.prepare('SELECT * FROM sessions ORDER BY updated_at DESC').all() as SessionRow[]).map(toSession);
 }
 
-export function updateSession(db: DB, id: string, patch: { provider?: Provider; model?: string; title?: string }): Session {
+/**
+ * Update model choice and/or apply an automatic title. `autoTitle` is ignored once the user has
+ * named the session (see renameSession), so a name chosen before the first message survives it.
+ */
+export function updateSession(db: DB, id: string, patch: { provider?: Provider; model?: string; autoTitle?: string }): Session {
   const s = requireSession(db, id);
+  const title = patch.autoTitle !== undefined && !s.customTitle ? patch.autoTitle : s.title;
   db.prepare('UPDATE sessions SET provider = ?, model = ?, title = ?, updated_at = ? WHERE id = ?').run(
-    patch.provider ?? s.provider, patch.model ?? s.model, patch.title ?? s.title, now(), id,
+    patch.provider ?? s.provider, patch.model ?? s.model, title, now(), id,
   );
+  return requireSession(db, id);
+}
+
+/**
+ * Set a user-chosen name (trimmed, 1-80 chars). Leaves updated_at alone so renaming doesn't
+ * reorder the session list, which is sorted by last activity.
+ */
+export function renameSession(db: DB, id: string, title: string): Session {
+  requireSession(db, id);
+  const trimmed = title.trim();
+  if (trimmed.length === 0) throw new AgentError('Session name cannot be empty');
+  if (trimmed.length > MAX_TITLE_LENGTH) throw new AgentError(`Session name must be at most ${MAX_TITLE_LENGTH} characters`);
+  db.prepare('UPDATE sessions SET title = ?, title_custom = 1 WHERE id = ?').run(trimmed, id);
   return requireSession(db, id);
 }
 

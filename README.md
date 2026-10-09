@@ -14,7 +14,7 @@ cp .env.example .env.local   # add OPENAI_API_KEY and/or GOOGLE_GENERATIVE_AI_AP
 npm run dev                  # http://localhost:3000
 ```
 
-The SQLite file is created at `data/agent.db`. Delete it to start fresh, or remove single sessions with the **×** next to each one in the sidebar (this also deletes its messages, tasks, tool log and summaries; approved memories are global and stay).
+The SQLite file is created at `data/agent.db`. Delete it to start fresh, or remove single sessions with the **×** next to each one in the sidebar (this also deletes its messages, tasks, tool log and summaries; approved memories are global and stay). Rename a session with the pencil icon or by double-clicking its name; otherwise it's named after your first message.
 
 ## Try it
 
