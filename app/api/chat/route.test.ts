@@ -27,12 +27,13 @@ const text = (t: string): LanguageModelV4StreamPart[] => [
 ];
 const stream = (parts: LanguageModelV4StreamPart[]) => ({ stream: convertArrayToReadableStream(parts) });
 
-// Scripted model: turn 1 = tool call then text; turn 2 = text. doGenerate = compaction summary.
+// Scripted model: turn 1 = tool call then text; turns 2 and 3 = text. doGenerate = compaction summary.
 const mockModel = new MockLanguageModelV4({
   doStream: [
     stream([{ type: 'stream-start', warnings: [] }, { type: 'tool-call', toolCallId: 'c1', toolName: 'createTask', input: '{"title":"Pick venue"}' }, finish('tool-calls')]),
     stream([{ type: 'stream-start', warnings: [] }, ...text('Created your plan.'), finish('stop')]),
     stream([{ type: 'stream-start', warnings: [] }, ...text('Sounds good.'), finish('stop')]),
+    stream([{ type: 'stream-start', warnings: [] }, ...text('Carrying on.'), finish('stop')]),
   ],
   doGenerate: async () => ({
     content: [{ type: 'text', text: '### User goal\nPlan an offsite' }],
@@ -54,13 +55,13 @@ const { getMcpClient } = await import('@/lib/mcp/client');
 
 let sessionId: string;
 
+const post = (body: unknown): Promise<Response> =>
+  POST(new Request('http://test/api/chat', { method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body) }));
+
+const userMessage = (id: string, t: string) => ({ id, role: 'user', parts: [{ type: 'text', text: t }] });
+
 async function send(id: string, t: string): Promise<void> {
-  const res = await POST(
-    new Request('http://test/api/chat', {
-      method: 'POST',
-      body: JSON.stringify({ sessionId, provider: 'openai', model: 'gpt-5-mini', message: { id, role: 'user', parts: [{ type: 'text', text: t }] } }),
-    }),
-  );
+  const res = await post({ sessionId, provider: 'openai', model: 'gpt-5-mini', message: userMessage(id, t) });
   expect(res.status).toBe(200);
   await res.text(); // drain the stream so onEnd runs
   await new Promise((r) => setTimeout(r, 50));
@@ -104,4 +105,32 @@ describe('POST /api/chat', () => {
     expect(repo.getMessages(db, sessionId).map((m) => m.id)).toEqual(['u2', expect.any(String)]);
     expect(repo.getMessages(db, sessionId, { includeCompacted: true })).toHaveLength(4);
   }, 30000);
+
+  it('feeds the compaction summary as tagged context, not system instructions', async () => {
+    await send('u3', 'Next');
+    const prompt = mockModel.doStreamCalls[3].prompt;
+    const system = prompt.filter((m) => m.role === 'system').map((m) => JSON.stringify(m.content)).join('');
+    expect(system).toContain('#1 [pending] Pick venue');
+    expect(system).not.toContain('Plan an offsite');
+    expect(prompt[1].role).toBe('user');
+    expect(JSON.stringify(prompt[1].content)).toContain('<conversation_summary>');
+  }, 30000);
+
+  it('rejects requests that are not a single plain-text user message', async () => {
+    const before = repo.getMessages(getDb(), sessionId, { includeCompacted: true }).length;
+    const base = { sessionId, provider: 'openai', model: 'gpt-5-mini' };
+
+    expect((await post('not json')).status).toBe(400);
+    expect((await post({ ...base })).status).toBe(400);
+    expect((await post({ ...base, message: { ...userMessage('x1', 'hi'), role: 'assistant' } })).status).toBe(400);
+    const fakeTool = { id: 'x2', role: 'user', parts: [{ type: 'tool-createTask', toolCallId: 'c', state: 'output-available', input: {}, output: { id: 1 } }] };
+    expect((await post({ ...base, message: fakeTool })).status).toBe(400);
+    expect((await post({ ...base, provider: 'nope', message: userMessage('x3', 'hi') })).status).toBe(400);
+    // Reusing a stored id would overwrite history.
+    expect((await post({ ...base, message: userMessage('u1', 'rewritten') })).status).toBe(409);
+
+    const all = repo.getMessages(getDb(), sessionId, { includeCompacted: true });
+    expect(all).toHaveLength(before);
+    expect(all.find((m) => m.id === 'u1')?.parts).toEqual([{ type: 'text', text: 'Help me plan an offsite' }]);
+  });
 });

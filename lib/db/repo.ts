@@ -150,7 +150,7 @@ export function updateSession(db: DB, id: string, patch: { provider?: Provider; 
 /** Insert new messages or update existing ones (matched by id). New ones get the next seq. */
 export function upsertMessages(db: DB, sessionId: string, messages: Pick<UIMessage, 'id' | 'role' | 'parts'>[]): void {
   const exists = db.prepare('SELECT 1 FROM messages WHERE id = ? AND session_id = ?');
-  const update = db.prepare('UPDATE messages SET parts_json = ? WHERE id = ?');
+  const update = db.prepare('UPDATE messages SET parts_json = ? WHERE id = ? AND session_id = ?');
   const nextSeq = db.prepare('SELECT COALESCE(MAX(seq), 0) + 1 AS seq FROM messages WHERE session_id = ?');
   const insert = db.prepare(
     'INSERT INTO messages (id, session_id, seq, role, parts_json, created_at) VALUES (?, ?, ?, ?, ?, ?)',
@@ -159,7 +159,7 @@ export function upsertMessages(db: DB, sessionId: string, messages: Pick<UIMessa
     for (const m of messages) {
       const parts = JSON.stringify(m.parts);
       if (exists.get(m.id, sessionId)) {
-        update.run(parts, m.id);
+        update.run(parts, m.id, sessionId);
       } else {
         const { seq } = nextSeq.get(sessionId) as { seq: number };
         insert.run(m.id, sessionId, seq, m.role, parts, now());
@@ -167,6 +167,11 @@ export function upsertMessages(db: DB, sessionId: string, messages: Pick<UIMessa
     }
     db.prepare('UPDATE sessions SET updated_at = ? WHERE id = ?').run(now(), sessionId);
   })();
+}
+
+/** True if a message with this id exists in any session (message ids are globally unique). */
+export function messageExists(db: DB, id: string): boolean {
+  return db.prepare('SELECT 1 FROM messages WHERE id = ?').get(id) !== undefined;
 }
 
 export function getMessages(db: DB, sessionId: string, opts: { includeCompacted?: boolean } = {}): StoredMessage[] {
@@ -190,8 +195,16 @@ export function markCompacted(db: DB, sessionId: string, throughSeq: number): vo
 
 // ---------------------------------------------------------------- tasks
 
+/** A completed workflow is final: tasks and the summary become read-only. A new goal needs a new session. */
+function assertNotComplete(db: DB, sessionId: string): void {
+  if (getLatestSummary(db, sessionId, 'final')) {
+    throw new AgentError('This workflow is already complete and read-only. Ask the user to start a new session for a new goal.');
+  }
+}
+
 export function createTask(db: DB, sessionId: string, input: { title: string; description?: string }): Task {
   requireSession(db, sessionId);
+  assertNotComplete(db, sessionId);
   const { pos } = db.prepare('SELECT COALESCE(MAX(position), 0) + 1 AS pos FROM tasks WHERE session_id = ?').get(sessionId) as { pos: number };
   const info = db
     .prepare('INSERT INTO tasks (session_id, position, title, description, updated_at) VALUES (?, ?, ?, ?, ?)')
@@ -211,6 +224,7 @@ export function listTasks(db: DB, sessionId: string): Task[] {
 
 export function updateTaskStatus(db: DB, sessionId: string, taskId: number, status: TaskStatus, note?: string): Task {
   getTask(db, sessionId, taskId); // throws if missing
+  assertNotComplete(db, sessionId);
   db.prepare('UPDATE tasks SET status = ?, note = COALESCE(?, note), updated_at = ? WHERE id = ?').run(status, note ?? null, now(), taskId);
   return getTask(db, sessionId, taskId);
 }
@@ -251,8 +265,9 @@ export function getLatestSummary(db: DB, sessionId: string, kind: Summary['kind'
   return r ? { id: r.id, kind: r.kind, content: r.content, coversThroughSeq: r.covers_through_seq, createdAt: r.created_at } : null;
 }
 
-/** The saveSummary tool: only allowed once every task is done or blocked. */
+/** The saveSummary tool: only allowed once every task is done or blocked, and only once per session. */
 export function saveFinalSummary(db: DB, sessionId: string, content: string): Summary {
+  assertNotComplete(db, sessionId);
   const { tasks } = getWorkflowState(db, sessionId);
   if (tasks.length === 0) throw new AgentError('Cannot complete a workflow with no tasks');
   const open = tasks.filter((t) => t.status === 'pending' || t.status === 'in_progress');

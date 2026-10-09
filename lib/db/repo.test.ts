@@ -35,6 +35,15 @@ describe('messages', () => {
     expect(msgs[1].parts).toEqual([{ type: 'text', text: 'edited' }]);
   });
 
+  it('reports existing message ids and never updates a message from another session', () => {
+    repo.upsertMessages(db, sessionId, [{ id: 'a', role: 'user', parts: [{ type: 'text', text: 'mine' }] }]);
+    expect(repo.messageExists(db, 'a')).toBe(true);
+    expect(repo.messageExists(db, 'zzz')).toBe(false);
+    const other = repo.createSession(db, { provider: 'openai', model: 'gpt-5-mini' }).id;
+    expect(() => repo.upsertMessages(db, other, [{ id: 'a', role: 'user', parts: [{ type: 'text', text: 'hijack' }] }])).toThrow();
+    expect(repo.getMessages(db, sessionId)[0].parts).toEqual([{ type: 'text', text: 'mine' }]);
+  });
+
   it('hides compacted messages but keeps them stored', () => {
     repo.upsertMessages(db, sessionId, ['a', 'b', 'c'].map((id) => ({ id, role: 'user' as const, parts: [] })));
     repo.markCompacted(db, sessionId, 2);
@@ -65,6 +74,17 @@ describe('tasks and workflow state', () => {
     const other = repo.createSession(db, { provider: 'openai', model: 'gpt-5-mini' }).id;
     const t = repo.createTask(db, other, { title: 'Theirs' });
     expect(() => repo.updateTaskStatus(db, sessionId, t.id, 'done')).toThrow(/not found/);
+  });
+
+  it('treats a completed workflow as read-only', () => {
+    const t = repo.createTask(db, sessionId, { title: 'Only step' });
+    repo.updateTaskStatus(db, sessionId, t.id, 'done');
+    repo.saveFinalSummary(db, sessionId, 'done');
+
+    expect(() => repo.createTask(db, sessionId, { title: 'New goal' })).toThrow(/already complete/);
+    expect(() => repo.updateTaskStatus(db, sessionId, t.id, 'pending')).toThrow(/already complete/);
+    expect(() => repo.saveFinalSummary(db, sessionId, 'again')).toThrow(/already complete/);
+    expect(repo.getWorkflowState(db, sessionId)).toMatchObject({ phase: 'complete', counts: { done: 1, pending: 0 } });
   });
 
   it('refuses a final summary with no tasks', () => {

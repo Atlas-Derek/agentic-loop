@@ -20,17 +20,17 @@ export function buildWorkflowTools(sessionId: string): ToolSet {
     tools[name] = tool({
       description: def.description,
       inputSchema: z.object(def.input),
-      execute: async (input: Record<string, unknown>) => {
+      execute: async (input: Record<string, unknown>, { abortSignal }) => {
         const started = Date.now();
         try {
-          const res = await callMcpTool(name, { ...input, sessionId });
+          const res = await callMcpTool(name, { ...input, sessionId }, { signal: abortSignal });
           logToolCall(getDb(), sessionId, {
             toolName: name, input, output: res.data, success: res.ok, error: res.error ?? undefined, durationMs: Date.now() - started,
           });
           // Return failures to the model as data so it can recover (e.g. retry with a valid task id).
           return res.ok ? res.data : { error: res.error };
         } catch (err) {
-          // Transport-level failure (MCP server down, etc.)
+          // Transport-level failure (MCP server down, timeout, request aborted by the user, etc.)
           const message = err instanceof Error ? err.message : String(err);
           logToolCall(getDb(), sessionId, { toolName: name, input, output: null, success: false, error: message, durationMs: Date.now() - started });
           return { error: `MCP call failed: ${message}` };

@@ -10,11 +10,18 @@ import { generateText, type LanguageModel, type UIMessage } from 'ai';
 import type { DB } from '../db/index';
 import * as repo from '../db/repo';
 
+/** Positive integer from an env var, or the fallback if unset/invalid (NaN would break selection). */
+function envInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === '') return fallback;
+  const n = Number(raw);
+  if (Number.isInteger(n) && n > 0) return n;
+  console.warn(`[compaction] ignoring invalid ${name}=${raw}; using ${fallback}`);
+  return fallback;
+}
+
 export function compactionSettings(): { after: number; keep: number } {
-  return {
-    after: Number(process.env.COMPACT_AFTER ?? 12),
-    keep: Number(process.env.KEEP_RECENT ?? 4),
-  };
+  return { after: envInt('COMPACT_AFTER', 12), keep: envInt('KEEP_RECENT', 4) };
 }
 
 /**

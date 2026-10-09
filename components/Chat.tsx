@@ -43,7 +43,11 @@ export function Chat({ sessionId, initialMessages, provider, model, onTurnEnd }:
 
   const [input, setInput] = useState('');
   const bottom = useRef<HTMLDivElement>(null);
-  useEffect(() => bottom.current?.scrollIntoView({ behavior: 'smooth' }), [messages]);
+  // Block body on purpose: scrollIntoView returns a Promise in current Chrome, and an effect must
+  // return nothing or a cleanup function ("destroy is not a function" otherwise).
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const busy = status === 'submitted' || status === 'streaming';
   const submit = () => {

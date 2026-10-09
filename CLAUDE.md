@@ -22,13 +22,16 @@ Browser (app/page.tsx, useChat)
 - `lib/mcp/schemas.ts` — single source of truth for tool names, descriptions and zod inputs.
 - `lib/models.ts` — client-safe model registry. `lib/agent/model.ts` — server-side provider construction.
 - Workflow phase is **derived** (`getWorkflowState`): no tasks → `clarifying`, tasks → `executing`, final summary → `complete`.
+  `complete` is terminal: task/summary tools refuse to write, and a new goal needs a new session.
+- Trust boundary: `/api/chat` accepts only one plain-text user message (zod-validated); history comes from SQLite.
+  The compaction summary is passed as a tagged context message, never in the system instructions.
 
 ## Commands
 
 Requires **Node 24** (`nvm use`); `better-sqlite3`'s prebuilt binary segfaults on Node 22.12.
 
 - `npm run dev` — app at http://localhost:3000 (spawns the MCP server automatically)
-- `npm test` — vitest (repo, compaction, MCP integration, mocked end-to-end agent loop)
+- `npm test` — vitest (repo, compaction, prompt, MCP integration, mocked end-to-end agent loop, jsdom page test)
 - `npm run typecheck`
 - `npm run mcp:inspect` — open the MCP Inspector against the tool server
 - `npm run build`

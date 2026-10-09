@@ -25,7 +25,7 @@ The SQLite file is created at `data/agent.db`. Delete it to start fresh.
 5. Switch the model in the left column mid-session; the next turn uses the new model.
 6. Reload the page or pick the session from the list: messages, tasks and tool logs come back.
 7. After ~12 messages, older ones are compacted (dimmed in chat, summary shown under **Compaction**). Originals stay in the DB.
-8. When all tasks are done the agent calls `saveSummary`; the phase flips to **complete** and the final summary appears.
+8. When all tasks are done the agent calls `saveSummary`; the phase flips to **complete** and the final summary appears. A completed session is read-only; start a new session for a new goal.
 
 Set `COMPACT_AFTER=6` in `.env.local` to see compaction sooner.
 
@@ -54,6 +54,6 @@ Set `COMPACT_AFTER=6` in `.env.local` to see compaction sooner.
 ## Tests
 
 ```bash
-npm test         # repo, compaction, real MCP server over stdio, and a mocked-model end-to-end agent loop
+npm test         # repo, compaction, prompt, real MCP server over stdio, mocked-model end-to-end agent loop, jsdom UI test
 npm run typecheck
 ```

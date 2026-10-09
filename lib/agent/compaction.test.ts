@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { UIMessage } from 'ai';
-import { selectMessagesToCompact, toTranscript } from './compaction';
+import { compactionSettings, selectMessagesToCompact, toTranscript } from './compaction';
 
 const msgs = (roles: string): { role: string; i: number }[] =>
   roles.split('').map((r, i) => ({ role: r === 'u' ? 'user' : 'assistant', i }));
@@ -23,6 +23,23 @@ describe('selectMessagesToCompact', () => {
 
   it('compacts nothing if no user message exists before the cut', () => {
     expect(selectMessagesToCompact(msgs('uaaaaa'), 4, 2)).toEqual([]);
+  });
+});
+
+describe('compactionSettings', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('reads positive integers from the environment', () => {
+    vi.stubEnv('COMPACT_AFTER', '6');
+    vi.stubEnv('KEEP_RECENT', '2');
+    expect(compactionSettings()).toEqual({ after: 6, keep: 2 });
+  });
+
+  it('falls back to defaults for invalid values instead of producing NaN', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.stubEnv('COMPACT_AFTER', 'abc');
+    vi.stubEnv('KEEP_RECENT', '-1');
+    expect(compactionSettings()).toEqual({ after: 12, keep: 4 });
   });
 });
 
