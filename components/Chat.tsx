@@ -2,7 +2,7 @@
 
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import type { StoredMessage } from '@/lib/api-types';
 
@@ -43,6 +43,15 @@ export function Chat({ sessionId, initialMessages, provider, model, onTurnEnd }:
   });
 
   const [input, setInput] = useState('');
+  const textarea = useRef<HTMLTextAreaElement>(null);
+  // Grow the box with its text (CSS max-height caps it, then it scrolls) and shrink it after sending.
+  // Layout effect so the height is right before paint; block body because effects must return nothing.
+  useLayoutEffect(() => {
+    const el = textarea.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
+  }, [input]);
   const bottom = useRef<HTMLDivElement>(null);
   // Block body on purpose: scrollIntoView returns a Promise in current Chrome, and an effect must
   // return nothing or a cleanup function ("destroy is not a function" otherwise).
@@ -76,7 +85,8 @@ export function Chat({ sessionId, initialMessages, provider, model, onTurnEnd }:
       {error && <div className="error">Error: {error.message}</div>}
       <div className="composer">
         <textarea
-          rows={2}
+          ref={textarea}
+          rows={1}
           value={input}
           placeholder="Message the agent (Enter to send, Shift+Enter for newline)"
           onChange={(e) => setInput(e.target.value)}

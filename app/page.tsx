@@ -7,6 +7,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Chat } from '@/components/Chat';
+import { ResizeHandle } from '@/components/ResizeHandle';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CompactionPanel, MemoryPanel, ModelSelector, SessionList, ToolCallLog, WorkflowPanel } from '@/components/Panels';
 import type { Memory, Provider, SessionState, SessionsResponse } from '@/lib/api-types';
@@ -123,6 +124,8 @@ export default function Home() {
         {activeId && <p className="muted session-id">Session ID: {activeId}</p>}
       </aside>
 
+      <ResizeHandle side="left" />
+
       <main className="col chat">
         {loadError && <div className="error">{loadError}</div>}
         {state && activeId ? (
@@ -141,6 +144,8 @@ export default function Home() {
           </div>
         )}
       </main>
+
+      <ResizeHandle side="right" />
 
       <aside className="col inspector">
         {state && (
