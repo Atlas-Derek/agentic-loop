@@ -69,7 +69,8 @@ export async function POST(req: Request): Promise<Response> {
     generateMessageId: createIdGenerator({ prefix: 'msg', size: 16 }),
     onError: (err) => (err instanceof Error ? err.message : String(err)),
     onEnd: async ({ messages }) => {
-      repo.upsertMessages(db, session.id, messages);
+      // Skip empty assistant messages (e.g. the model call failed before producing anything).
+      repo.upsertMessages(db, session.id, messages.filter((m) => m.parts.length > 0));
       try {
         const summary = await maybeCompact(db, session.id, model);
         if (summary) console.log(`[compaction] session ${session.id} compacted through seq ${summary.coversThroughSeq}`);

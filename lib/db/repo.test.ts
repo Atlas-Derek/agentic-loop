@@ -13,9 +13,9 @@ beforeEach(() => {
 describe('sessions', () => {
   it('creates, lists and switches model', () => {
     expect(repo.listSessions(db)).toHaveLength(1);
-    const s = repo.updateSession(db, sessionId, { provider: 'google', model: 'gemini-2.5-flash' });
+    const s = repo.updateSession(db, sessionId, { provider: 'google', model: 'gemini-3.8-flash' });
     expect(s.provider).toBe('google');
-    expect(s.model).toBe('gemini-2.5-flash');
+    expect(s.model).toBe('gemini-3.8-flash');
   });
 
   it('throws for a missing session', () => {

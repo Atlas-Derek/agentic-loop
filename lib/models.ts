@@ -9,8 +9,8 @@ export type ModelOption = { provider: Provider; id: string; label: string };
 export const MODELS: ModelOption[] = [
   { provider: 'openai', id: 'gpt-5-mini', label: 'OpenAI · GPT-5 mini' },
   { provider: 'openai', id: 'gpt-5', label: 'OpenAI · GPT-5' },
-  { provider: 'google', id: 'gemini-2.5-flash', label: 'Google · Gemini 2.5 Flash' },
-  { provider: 'google', id: 'gemini-2.5-pro', label: 'Google · Gemini 2.5 Pro' },
+  { provider: 'google', id: 'gemini-3.8-flash', label: 'Google · Gemini 3.8 Flash' },
+  { provider: 'google', id: 'gemini-pro-latest', label: 'Google · Gemini Pro (latest)' },
 ];
 
 export const DEFAULT_MODEL: ModelOption = MODELS[0];

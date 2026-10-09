@@ -3,7 +3,7 @@
 A small agentic app that takes a user goal, reasons through the steps, calls tools over MCP, keeps session state, and completes a simple workflow.
 
 Stack: Next.js 16 · Vercel AI SDK 7 · Model Context Protocol (stdio) · SQLite (better-sqlite3).
-Models: OpenAI (GPT-5 mini, GPT-5) and Google (Gemini 2.5 Flash, Gemini 2.5 Pro), switchable per message.
+Models: OpenAI (GPT-5 mini, GPT-5) and Google (Gemini 3.8 Flash, Gemini Pro latest), switchable per message.
 
 ## Run it
 
