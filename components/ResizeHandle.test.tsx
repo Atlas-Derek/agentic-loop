@@ -104,10 +104,13 @@ describe('layout init script', () => {
     expect(cssWidth('left')).toBe('');
   });
 
-  it('does not throw when storage is blocked', () => {
+  it('falls back to the stylesheet defaults when storage is blocked', () => {
+    localStorage.setItem(panelStorageKey('left'), '300');
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('SecurityError');
     });
     expect(() => new Function(LAYOUT_INIT_SCRIPT)()).not.toThrow();
+    expect(cssWidth('left')).toBe('');
+    expect(cssWidth('right')).toBe('');
   });
 });

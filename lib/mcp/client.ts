@@ -15,7 +15,7 @@ const TOOL_TIMEOUT_MS = 15_000;
  * The tool server only needs a minimal, safe environment plus its DB path.
  * In particular it must NOT inherit provider API keys.
  */
-function serverEnv(): Record<string, string> {
+export function serverEnv(): Record<string, string> {
   const env = getDefaultEnvironment();
   for (const key of ['AGENT_DB_PATH', 'NODE_ENV'] as const) {
     const value = process.env[key];

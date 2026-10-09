@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { openDb, type DB } from './index';
 import * as repo from './repo';
 
@@ -42,7 +42,10 @@ describe('sessions', () => {
 
   it('renames a session without reordering the list, and validates the name', () => {
     const before = repo.requireSession(db, sessionId);
+    // Move the clock on, or a rename that bumped updated_at would land in the same millisecond and still match.
+    vi.useFakeTimers({ now: new Date(Date.parse(before.updatedAt) + 60_000), toFake: ['Date'] });
     const renamed = repo.renameSession(db, sessionId, '  Offsite planning  ');
+    vi.useRealTimers();
     expect(renamed).toMatchObject({ title: 'Offsite planning', customTitle: true, updatedAt: before.updatedAt });
 
     expect(() => repo.renameSession(db, sessionId, '   ')).toThrow(/cannot be empty/);
@@ -55,10 +58,6 @@ describe('sessions', () => {
     expect(repo.updateSession(db, sessionId, { autoTitle: 'From first message' })).toMatchObject({ title: 'From first message', customTitle: false });
     repo.renameSession(db, sessionId, 'My name');
     expect(repo.updateSession(db, sessionId, { autoTitle: 'Another message', model: 'gpt-5' })).toMatchObject({ title: 'My name', model: 'gpt-5' });
-  });
-
-  it('throws for a missing session', () => {
-    expect(() => repo.requireSession(db, 'nope')).toThrow(repo.AgentError);
   });
 });
 

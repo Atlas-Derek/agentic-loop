@@ -41,11 +41,12 @@ describe('theme init script', () => {
     expect(html.dataset.theme).toBe('dark');
   });
 
-  it('does not throw when storage is blocked', () => {
+  it('still follows the OS preference when storage is blocked', () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('SecurityError');
     });
     expect(() => runInitScript(true)).not.toThrow();
+    expect(html.dataset.theme).toBe('dark');
   });
 });
 

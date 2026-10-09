@@ -9,7 +9,7 @@
  */
 import { tool, type ToolSet } from 'ai';
 import { z } from 'zod';
-import { getDb } from '../db/index';
+import { getDb, type DB } from '../db/index';
 import { logToolCall } from '../db/repo';
 import { callMcpTool } from '../mcp/client';
 import { TOOL_DEFS, TOOL_NAMES } from '../mcp/schemas';
@@ -28,7 +28,10 @@ export function capToolOutput(output: unknown, max = MAX_TOOL_OUTPUT_CHARS): unk
   };
 }
 
-export function buildWorkflowTools(sessionId: string): ToolSet {
+/** Collaborators of the tool wrappers; tests pass an in-memory DB and a fake MCP call. */
+export type WorkflowToolDeps = { getDb: () => DB; callMcpTool: typeof callMcpTool };
+
+export function buildWorkflowTools(sessionId: string, deps: WorkflowToolDeps = { getDb, callMcpTool }): ToolSet {
   const tools: ToolSet = {};
   for (const name of TOOL_NAMES) {
     const def = TOOL_DEFS[name];
@@ -38,8 +41,8 @@ export function buildWorkflowTools(sessionId: string): ToolSet {
       execute: async (input: Record<string, unknown>, { abortSignal }) => {
         const started = Date.now();
         try {
-          const res = await callMcpTool(name, { ...input, sessionId }, { signal: abortSignal });
-          logToolCall(getDb(), sessionId, {
+          const res = await deps.callMcpTool(name, { ...input, sessionId }, { signal: abortSignal });
+          logToolCall(deps.getDb(), sessionId, {
             toolName: name, input, output: res.data, success: res.ok, error: res.error ?? undefined, durationMs: Date.now() - started,
           });
           // Return failures to the model as data so it can recover (e.g. retry with a valid task id).
@@ -47,7 +50,7 @@ export function buildWorkflowTools(sessionId: string): ToolSet {
         } catch (err) {
           // Transport-level failure (MCP server down, timeout, request aborted by the user, etc.)
           const message = err instanceof Error ? err.message : String(err);
-          logToolCall(getDb(), sessionId, { toolName: name, input, output: null, success: false, error: message, durationMs: Date.now() - started });
+          logToolCall(deps.getDb(), sessionId, { toolName: name, input, output: null, success: false, error: message, durationMs: Date.now() - started });
           return { error: `MCP call failed: ${message}` };
         }
       },

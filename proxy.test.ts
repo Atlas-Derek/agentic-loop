@@ -24,9 +24,17 @@ describe('proxy: API write protection', () => {
     expect(res.status).toBe(403);
   });
 
+  it('rejects writes from an opaque origin (sandboxed iframe, data: URL) instead of crashing', () => {
+    const res = proxy(req('/api/chat', { method: 'POST', headers: { ...json, origin: 'null' } }));
+    expect(res.status).toBe(403);
+  });
+
   it('rejects non-JSON writes, which a plain HTML form could send cross-site', () => {
     expect(proxy(req('/api/chat', { method: 'POST', headers: { 'content-type': 'text/plain' } })).status).toBe(415);
     expect(proxy(req('/api/chat', { method: 'POST' })).status).toBe(415);
+    // A CORS-safelisted type that merely mentions JSON in a parameter is still text/plain.
+    expect(proxy(req('/api/chat', { method: 'POST', headers: { 'content-type': 'text/plain; x=application/json' } })).status).toBe(415);
+    expect(passes(proxy(req('/api/chat', { method: 'POST', headers: { 'content-type': 'Application/JSON; charset=utf-8' } })))).toBe(true);
   });
 });
 

@@ -27,8 +27,10 @@ Browser (app/page.tsx, useChat)
   Model-written state (approved memories, task list, compaction summary) is passed as a tagged context message
   (`buildContextMessages`), never in the system instructions; tool text inputs have length caps (`TEXT_LIMITS`).
 - `proxy.ts` guards every request: `Host` must be loopback or in `ALLOWED_HOSTS` (non-loopback also needs `APP_PASSWORD`);
-  state-changing `/api/*` calls must be same-origin JSON; optional `APP_PASSWORD` adds HTTP Basic auth.
-- `next.config.ts` sets the CSP (`img-src 'self'`, `frame-ancestors 'none'`); assistant markdown renders images as alt text.
+  state-changing `/api/*` calls must be same-origin (an opaque `Origin: null` is rejected) with media type exactly
+  `application/json`; optional `APP_PASSWORD` adds HTTP Basic auth.
+- `next.config.ts` sets the CSP (`default-src 'self'`, `img-src 'self' blob: data:`, `frame-ancestors 'none'`); assistant markdown
+  renders images as alt text. `next.config.test.ts` pins these headers.
 - Compaction runs in the background after a turn using the provider's `summarizer` model (`lib/models.ts`);
   the next turn awaits it (`waitForCompaction`).
 - Schema changes to existing tables need a step in `migrate()` (`lib/db/index.ts`); `CREATE TABLE IF NOT EXISTS`
@@ -40,7 +42,8 @@ Browser (app/page.tsx, useChat)
 Requires **Node 24** (`nvm use`); `better-sqlite3`'s prebuilt binary segfaults on Node 22.12.
 
 - `npm run dev` — app at http://localhost:3000, bound to 127.0.0.1 (spawns the MCP server automatically)
-- `npm test` — vitest (repo, compaction, prompt, MCP integration, mocked end-to-end agent loop, jsdom page test)
+- `npm test` — vitest (repo, compaction, prompt, tool wrapper, MCP integration, mocked end-to-end agent loop, API routes,
+  proxy, security headers, jsdom UI tests). Run `nvm use` first: the tests don't start on older Node versions.
 - `npm run typecheck`
 - `npm run mcp:inspect` — open the MCP Inspector against the tool server
 - `npm run build`
@@ -62,7 +65,10 @@ Env (`.env.local`): `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, optional `
   (no enums, namespaces or parameter properties). The spawned server gets a minimal env (no API keys).
 - To add a tool: add it to `lib/mcp/schemas.ts`, implement it in `lib/db/repo.ts`, register it in `mcp-server/index.ts`.
   The AI SDK wrapper picks it up automatically.
-- Tests live next to the code as `*.test.ts`. Prefer dependency injection (pass a DB) over mocking globals.
+- Tests live next to the code as `*.test.ts`. Prefer dependency injection (pass a DB) over mocking globals;
+  `buildWorkflowTools` takes optional `{ getDb, callMcpTool }` for this.
+- Agent loop tests (`app/api/chat/route.test.ts`) script a `MockLanguageModelV4` per test. Assert on what the model actually
+  received (`doStreamCalls[n].prompt`, `toolChoice`) and on SQLite state, not just on text that could come from another source.
 
 ## Git
 

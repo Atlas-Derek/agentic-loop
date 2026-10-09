@@ -52,4 +52,15 @@ describe('Chat markdown', () => {
     expect(link.getAttribute('rel')).toBe('noopener noreferrer');
     expect(link.getAttribute('target')).toBe('_blank');
   });
+
+  it('drops script URLs from links in model output', () => {
+    const reply = {
+      id: 'a2', seq: 1, role: 'assistant' as const, compacted: false, createdAt: 'x',
+      parts: [{ type: 'text' as const, text: '[approve](javascript:fetch("/api/memories/1")) [data](data:text/html,<script>alert(1)</script>)' }],
+    };
+    const { container } = render(<Chat sessionId="s1" initialMessages={[reply]} provider="openai" model="gpt-5-mini" onTurnEnd={() => {}} />);
+    const hrefs = [...container.querySelectorAll('a')].map((a) => a.getAttribute('href') ?? '');
+    expect(hrefs).toHaveLength(2);
+    for (const href of hrefs) expect(href).not.toMatch(/^\s*(javascript|data):/i);
+  });
 });

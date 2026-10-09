@@ -38,6 +38,20 @@ function allowedHosts(): Set<string> {
   );
 }
 
+/** host:port of an Origin header, or null for an opaque ("null") or malformed origin, which is never same-origin. */
+function originHost(origin: string): string | null {
+  try {
+    return new URL(origin).host;
+  } catch {
+    return null;
+  }
+}
+
+/** The MIME type without parameters, so "text/plain; x=application/json" is still text/plain. */
+function mediaType(contentType: string | null): string {
+  return (contentType ?? '').split(';')[0].trim().toLowerCase();
+}
+
 function passwordMatches(authorization: string | null, password: string): boolean {
   if (!authorization?.startsWith('Basic ')) return false;
   const decoded = Buffer.from(authorization.slice('Basic '.length), 'base64').toString('utf8');
@@ -66,10 +80,10 @@ export function proxy(req: NextRequest): NextResponse {
 
   if (req.nextUrl.pathname.startsWith('/api/') && !SAFE_METHODS.has(req.method)) {
     const origin = req.headers.get('origin');
-    if (origin !== null && new URL(origin).host !== req.headers.get('host')) {
+    if (origin !== null && originHost(origin) !== req.headers.get('host')) {
       return NextResponse.json({ error: 'Cross-origin request rejected' }, { status: 403 });
     }
-    if (!req.headers.get('content-type')?.includes('application/json')) {
+    if (mediaType(req.headers.get('content-type')) !== 'application/json') {
       return NextResponse.json({ error: 'Content-Type must be application/json' }, { status: 415 });
     }
   }

@@ -8,8 +8,11 @@ export type Theme = 'light' | 'dark';
 
 export const THEME_STORAGE_KEY = 'theme';
 
-/** Saved choice if valid, otherwise the OS preference. Wrapped in try/catch: storage can be blocked. */
-export const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});if(t!=="light"&&t!=="dark")t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.setAttribute("data-theme",t)}catch(e){}})()`;
+/**
+ * Saved choice if valid, otherwise the OS preference. Storage can be blocked, so reading it has its own
+ * try/catch: a blocked read must still fall through to the OS preference rather than skip theming.
+ */
+export const THEME_INIT_SCRIPT = `(function(){var t;try{t=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)})}catch(e){}try{if(t!=="light"&&t!=="dark")t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.setAttribute("data-theme",t)}catch(e){}})()`;
 
 export function readTheme(): Theme {
   return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
