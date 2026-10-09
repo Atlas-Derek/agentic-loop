@@ -5,16 +5,28 @@ import { MODELS } from '@/lib/models';
 
 // ---------------------------------------------------------------- left column
 
-export function SessionList(props: { sessions: Session[]; activeId: string | null; onSelect: (id: string) => void; onNew: () => void }) {
+export function SessionList(props: {
+  sessions: Session[];
+  activeId: string | null;
+  onSelect: (id: string) => void;
+  onNew: () => void;
+  onDelete: (session: Session) => void;
+}) {
   return (
     <>
       <h3>Sessions</h3>
       <button onClick={props.onNew} style={{ width: '100%', marginBottom: 8 }}>+ New session</button>
       {props.sessions.map((s) => (
-        <button key={s.id} className={`session ${s.id === props.activeId ? 'active' : ''}`} onClick={() => props.onSelect(s.id)} title={s.id}>
-          {s.title}
-          <div className="muted">{s.model} · {new Date(s.updatedAt).toLocaleString()}</div>
-        </button>
+        // Two sibling buttons (a button can't contain another button).
+        <div key={s.id} className="session-row">
+          <button className={`session ${s.id === props.activeId ? 'active' : ''}`} onClick={() => props.onSelect(s.id)} title={s.id}>
+            {s.title}
+            <div className="muted">{s.model} · {new Date(s.updatedAt).toLocaleString()}</div>
+          </button>
+          <button className="session-delete" onClick={() => props.onDelete(s)} aria-label={`Delete session ${s.title}`} title="Delete session">
+            ×
+          </button>
+        </div>
       ))}
     </>
   );

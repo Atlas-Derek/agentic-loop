@@ -145,6 +145,18 @@ export function updateSession(db: DB, id: string, patch: { provider?: Provider; 
   return requireSession(db, id);
 }
 
+/**
+ * Permanently delete a session. Messages, tasks, tool calls and summaries go with it via ON DELETE CASCADE
+ * (openDb enables foreign keys). Memories are global, so they are kept; only their source link is cleared.
+ */
+export function deleteSession(db: DB, id: string): void {
+  requireSession(db, id);
+  db.transaction(() => {
+    db.prepare('UPDATE memories SET source_session_id = NULL WHERE source_session_id = ?').run(id);
+    db.prepare('DELETE FROM sessions WHERE id = ?').run(id);
+  })();
+}
+
 // ---------------------------------------------------------------- messages
 
 /** Insert new messages or update existing ones (matched by id). New ones get the next seq. */

@@ -105,6 +105,8 @@ export async function POST(req: Request): Promise<Response> {
     generateMessageId: createIdGenerator({ prefix: 'msg', size: 16 }),
     onError: (err) => (err instanceof Error ? err.message : String(err)),
     onEnd: async ({ messages, isAborted, isCancelled }) => {
+      // The session may have been deleted while this turn was streaming; there is nothing to save to.
+      if (!repo.getSession(db, session.id)) return;
       // Skip empty assistant messages (e.g. the model call failed before producing anything).
       // Partial turns are still saved so the user sees what happened before they stopped.
       repo.upsertMessages(db, session.id, messages.filter((m) => m.parts.length > 0));

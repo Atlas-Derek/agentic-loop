@@ -67,6 +67,19 @@ export default function Home() {
       await selectSession(s.id);
     });
 
+  const deleteSession = (id: string, title: string) =>
+    run(async () => {
+      if (!window.confirm(`Delete "${title}"? Its messages, tasks and tool log are removed permanently.`)) return;
+      await getJson(`/api/sessions/${id}`, { method: 'DELETE' });
+      if (id === activeId) {
+        // Unmounting the chat pane also aborts any turn still streaming for this session.
+        setActiveId(null);
+        setState(null);
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+      await refreshList();
+    });
+
   const changeModel = (provider: Provider, model: string) =>
     run(async () => {
       if (!activeId) return;
@@ -91,7 +104,13 @@ export default function Home() {
   return (
     <div className="app">
       <div className="col">
-        <SessionList sessions={list.sessions} activeId={activeId} onSelect={(id) => void selectSession(id)} onNew={() => void newSession()} />
+        <SessionList
+          sessions={list.sessions}
+          activeId={activeId}
+          onSelect={(id) => void selectSession(id)}
+          onNew={() => void newSession()}
+          onDelete={(s) => void deleteSession(s.id, s.title)}
+        />
         {state && (
           <ModelSelector provider={state.session.provider} model={state.session.model} available={list.providers} onChange={(p, m) => void changeModel(p, m)} />
         )}

@@ -38,6 +38,10 @@ const defaultFetch = async (input: RequestInfo | URL, init?: RequestInit): Promi
   }
   if (url === '/api/sessions') return Response.json({ sessions: created ? [session] : [], providers: { openai: true, google: false } });
   if (url === '/api/memories') return Response.json([]);
+  if (url === `/api/sessions/${session.id}` && method === 'DELETE') {
+    created = false;
+    return Response.json({ deleted: true, id: session.id });
+  }
   if (url === `/api/sessions/${session.id}`) return Response.json(sessionState);
   return Response.json({ error: `unexpected ${method} ${url}` }, { status: 500 });
 };
@@ -88,6 +92,34 @@ describe('Home', () => {
     expect(errors).toEqual([]);
     expect(consoleError.mock.calls.map((c) => String(c[0]))).toEqual([]);
     consoleError.mockRestore();
+  });
+
+  it('deletes the open session after confirmation and returns to the empty state', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<Home />);
+    await userEvent.click(screen.getByRole('button', { name: '+ New session' }));
+    await waitFor(() => expect(screen.getByPlaceholderText(/Message the agent/)).toBeTruthy());
+
+    await userEvent.click(screen.getByRole('button', { name: `Delete session ${session.title}` }));
+
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining(`Delete "${session.title}"?`));
+    await waitFor(() => expect(screen.getByText('Create or select a session to start.')).toBeTruthy());
+    expect(fetchMock).toHaveBeenCalledWith(`/api/sessions/${session.id}`, expect.objectContaining({ method: 'DELETE' }));
+    expect(screen.queryByPlaceholderText(/Message the agent/)).toBeNull();
+    expect(screen.queryByRole('button', { name: `Delete session ${session.title}` })).toBeNull();
+    expect(window.location.search).toBe('');
+  });
+
+  it('keeps the session when deletion is cancelled', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<Home />);
+    await userEvent.click(screen.getByRole('button', { name: '+ New session' }));
+    await waitFor(() => expect(screen.getByPlaceholderText(/Message the agent/)).toBeTruthy());
+
+    await userEvent.click(screen.getByRole('button', { name: `Delete session ${session.title}` }));
+
+    expect(fetchMock).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ method: 'DELETE' }));
+    expect(screen.getByPlaceholderText(/Message the agent/)).toBeTruthy();
   });
 
   it('shows an error banner when creating a session fails, instead of an unhandled rejection', async () => {

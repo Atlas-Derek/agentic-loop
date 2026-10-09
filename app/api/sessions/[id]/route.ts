@@ -1,6 +1,7 @@
 import { getDb } from '@/lib/db';
 import * as repo from '@/lib/db/repo';
 import { findModel } from '@/lib/models';
+import { waitForCompaction } from '@/lib/agent/compaction';
 
 export const runtime = 'nodejs';
 
@@ -34,6 +35,19 @@ export async function PATCH(req: Request, { params }: Ctx): Promise<Response> {
   if (!choice) return Response.json({ error: 'Unknown model' }, { status: 400 });
   try {
     return Response.json(repo.updateSession(getDb(), id, { provider: choice.provider, model: choice.id }));
+  } catch (err) {
+    return Response.json({ error: err instanceof Error ? err.message : String(err) }, { status: 404 });
+  }
+}
+
+/** Permanently delete a session and everything stored for it (memories are global and kept). */
+export async function DELETE(_req: Request, { params }: Ctx): Promise<Response> {
+  const { id } = await params;
+  // Let any background compaction for this session finish first, so it doesn't write to a deleted session.
+  await waitForCompaction(id);
+  try {
+    repo.deleteSession(getDb(), id);
+    return Response.json({ deleted: true, id });
   } catch (err) {
     return Response.json({ error: err instanceof Error ? err.message : String(err) }, { status: 404 });
   }

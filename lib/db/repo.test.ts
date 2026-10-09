@@ -18,6 +18,28 @@ describe('sessions', () => {
     expect(s.model).toBe('gemini-3.8-flash');
   });
 
+  it('deletes a session and everything stored for it, but keeps global memories', () => {
+    const other = repo.createSession(db, { provider: 'openai', model: 'gpt-5-mini' }).id;
+    for (const id of [sessionId, other]) {
+      repo.upsertMessages(db, id, [{ id: `m-${id}`, role: 'user', parts: [{ type: 'text', text: 'hi' }] }]);
+      repo.createTask(db, id, { title: 'Step' });
+      repo.logToolCall(db, id, { toolName: 'createTask', input: {}, output: {}, success: true, durationMs: 1 });
+      repo.addSummary(db, id, 'compaction', 'summary', 1);
+    }
+    const memory = repo.proposeMemory(db, { content: 'Prefers TS', sourceSessionId: sessionId });
+
+    repo.deleteSession(db, sessionId);
+
+    expect(repo.getSession(db, sessionId)).toBeNull();
+    for (const table of ['messages', 'tasks', 'tool_calls', 'summaries']) {
+      const count = (sid: string) => (db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE session_id = ?`).get(sid) as { n: number }).n;
+      expect([table, count(sessionId)]).toEqual([table, 0]);
+      expect([table, count(other)]).toEqual([table, 1]);
+    }
+    expect(repo.listMemories(db)).toEqual([expect.objectContaining({ id: memory.id, content: 'Prefers TS', sourceSessionId: null })]);
+    expect(() => repo.deleteSession(db, sessionId)).toThrow(repo.AgentError);
+  });
+
   it('throws for a missing session', () => {
     expect(() => repo.requireSession(db, 'nope')).toThrow(repo.AgentError);
   });

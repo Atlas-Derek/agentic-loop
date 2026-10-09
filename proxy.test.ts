@@ -15,6 +15,8 @@ describe('proxy: API write protection', () => {
     expect(passes(proxy(req('/api/chat', { method: 'POST', headers: { ...json, origin: 'http://localhost:3000' } })))).toBe(true);
     expect(passes(proxy(req('/api/sessions', { method: 'POST', headers: json })))).toBe(true); // no Origin (e.g. curl)
     expect(passes(proxy(req('/api/sessions')))).toBe(true);
+    // The UI's session delete sends a JSON DELETE.
+    expect(passes(proxy(req('/api/sessions/abc', { method: 'DELETE', headers: { ...json, origin: 'http://localhost:3000' } })))).toBe(true);
   });
 
   it('rejects cross-origin writes', () => {

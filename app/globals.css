@@ -9,7 +9,10 @@ button:disabled { opacity: .5; cursor: default; }
 .col:last-child { border-right: 0; background: #fafafa; }
 h3 { margin: 16px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: #6e6e73; }
 h3:first-child { margin-top: 0; }
-.session { display: block; width: 100%; text-align: left; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-row { display: flex; gap: 4px; margin-bottom: 4px; }
+.session { display: block; flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-delete { flex: none; padding: 0 8px; color: #6e6e73; }
+.session-delete:hover { color: #c62828; border-color: #c62828; }
 .session.active { border-color: #0071e3; background: #eaf3ff; }
 .muted { color: #6e6e73; font-size: 12px; }
 .chat { display: flex; flex-direction: column; height: 100vh; padding: 0; }
