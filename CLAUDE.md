@@ -24,8 +24,11 @@ Browser (app/page.tsx, useChat)
 - Workflow phase is **derived** (`getWorkflowState`): no tasks → `clarifying`, tasks → `executing`, final summary → `complete`.
   `complete` is terminal: task/summary tools refuse to write, and a new goal needs a new session.
 - Trust boundary: `/api/chat` accepts only one plain-text user message (zod-validated); history comes from SQLite.
-  The compaction summary is passed as a tagged context message, never in the system instructions.
-- `proxy.ts` guards every request: state-changing `/api/*` calls must be same-origin JSON; optional `APP_PASSWORD` adds HTTP Basic auth.
+  Model-written state (approved memories, task list, compaction summary) is passed as a tagged context message
+  (`buildContextMessages`), never in the system instructions; tool text inputs have length caps (`TEXT_LIMITS`).
+- `proxy.ts` guards every request: `Host` must be loopback or in `ALLOWED_HOSTS` (non-loopback also needs `APP_PASSWORD`);
+  state-changing `/api/*` calls must be same-origin JSON; optional `APP_PASSWORD` adds HTTP Basic auth.
+- `next.config.ts` sets the CSP (`img-src 'self'`, `frame-ancestors 'none'`); assistant markdown renders images as alt text.
 - Compaction runs in the background after a turn using the provider's `summarizer` model (`lib/models.ts`);
   the next turn awaits it (`waitForCompaction`).
 - Schema changes to existing tables need a step in `migrate()` (`lib/db/index.ts`); `CREATE TABLE IF NOT EXISTS`
@@ -36,13 +39,13 @@ Browser (app/page.tsx, useChat)
 
 Requires **Node 24** (`nvm use`); `better-sqlite3`'s prebuilt binary segfaults on Node 22.12.
 
-- `npm run dev` — app at http://localhost:3000 (spawns the MCP server automatically)
+- `npm run dev` — app at http://localhost:3000, bound to 127.0.0.1 (spawns the MCP server automatically)
 - `npm test` — vitest (repo, compaction, prompt, MCP integration, mocked end-to-end agent loop, jsdom page test)
 - `npm run typecheck`
 - `npm run mcp:inspect` — open the MCP Inspector against the tool server
 - `npm run build`
 
-Env (`.env.local`): `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, optional `AGENT_DB_PATH`, `COMPACT_AFTER`, `KEEP_RECENT`, `APP_PASSWORD`.
+Env (`.env.local`): `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, optional `AGENT_DB_PATH`, `COMPACT_AFTER`, `KEEP_RECENT`, `APP_PASSWORD`, `ALLOWED_HOSTS`.
 
 ## Conventions
 

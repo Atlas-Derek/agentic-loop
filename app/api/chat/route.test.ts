@@ -94,7 +94,7 @@ describe('POST /api/chat', { shuffle: false }, () => {
     expect(repo.getSession(db, sessionId)?.title).toBe('Help me plan an offsite');
   }, 30000);
 
-  it('replays history with tool results, includes task state in instructions, and compacts', async () => {
+  it('replays history with tool results, includes live task state, and compacts', async () => {
     await send('u2', 'Great');
     const db = getDb();
 
@@ -109,14 +109,17 @@ describe('POST /api/chat', { shuffle: false }, () => {
     expect(repo.getMessages(db, sessionId, { includeCompacted: true })).toHaveLength(4);
   }, 30000);
 
-  it('feeds the compaction summary as tagged context, not system instructions', async () => {
+  it('feeds the task list and compaction summary as tagged context, not system instructions', async () => {
     await send('u3', 'Next');
     const prompt = mockModel.doStreamCalls[3].prompt;
     const system = prompt.filter((m) => m.role === 'system').map((m) => JSON.stringify(m.content)).join('');
-    expect(system).toContain('#1 [pending] Pick venue');
+    expect(system).toContain('Phase: executing');
+    expect(system).not.toContain('Pick venue');
     expect(system).not.toContain('Plan an offsite');
     expect(prompt[1].role).toBe('user');
-    expect(JSON.stringify(prompt[1].content)).toContain('<conversation_summary>');
+    const context = JSON.stringify(prompt[1].content);
+    expect(context).toContain('#1 [pending] Pick venue');
+    expect(context).toContain('<conversation_summary>');
   }, 30000);
 
   it('rejects requests that are not a single plain-text user message', async () => {

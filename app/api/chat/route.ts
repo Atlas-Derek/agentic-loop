@@ -11,7 +11,7 @@ import { z } from 'zod';
 import { getDb } from '@/lib/db';
 import * as repo from '@/lib/db/repo';
 import { getCompactionModel, getModel } from '@/lib/agent/model';
-import { buildInstructions, buildSummaryMessages } from '@/lib/agent/prompt';
+import { buildContextMessages, buildInstructions } from '@/lib/agent/prompt';
 import { limitFinalStep } from '@/lib/agent/steps';
 import { buildWorkflowTools } from '@/lib/agent/tools';
 import { scheduleCompaction, waitForCompaction } from '@/lib/agent/compaction';
@@ -81,16 +81,18 @@ export async function POST(req: Request): Promise<Response> {
 
   const history: UIMessage[] = repo.getMessages(db, session.id).map(({ id, role, parts }) => ({ id, role, parts }));
   const tools = buildWorkflowTools(session.id);
-  const instructions = buildInstructions({
-    workflow: repo.getWorkflowState(db, session.id),
-    memories: repo.listMemories(db, 'approved'),
-  });
+  const workflow = repo.getWorkflowState(db, session.id);
+  const instructions = buildInstructions({ workflow });
 
   const result = streamText({
     model,
     instructions,
     messages: [
-      ...buildSummaryMessages(repo.getLatestSummary(db, session.id, 'compaction')),
+      ...buildContextMessages({
+        workflow,
+        memories: repo.listMemories(db, 'approved'),
+        compaction: repo.getLatestSummary(db, session.id, 'compaction'),
+      }),
       ...(await convertToModelMessages(history, { tools, ignoreIncompleteToolCalls: true })),
     ],
     tools,
