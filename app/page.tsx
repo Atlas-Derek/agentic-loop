@@ -7,6 +7,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Chat } from '@/components/Chat';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { CompactionPanel, MemoryPanel, ModelSelector, SessionList, ToolCallLog, WorkflowPanel } from '@/components/Panels';
 import type { Memory, Provider, SessionState, SessionsResponse } from '@/lib/api-types';
 
@@ -103,7 +104,12 @@ export default function Home() {
 
   return (
     <div className="app">
-      <div className="col">
+      <aside className="col sidebar">
+        <header className="brand">
+          <span className="brand-mark" aria-hidden="true" />
+          <span className="brand-name">Workflow Agent</span>
+          <ThemeToggle />
+        </header>
         <SessionList
           sessions={list.sessions}
           activeId={activeId}
@@ -114,10 +120,10 @@ export default function Home() {
         {state && (
           <ModelSelector provider={state.session.provider} model={state.session.model} available={list.providers} onChange={(p, m) => void changeModel(p, m)} />
         )}
-        {activeId && <p className="muted" style={{ wordBreak: 'break-all' }}>Session ID: {activeId}</p>}
-      </div>
+        {activeId && <p className="muted session-id">Session ID: {activeId}</p>}
+      </aside>
 
-      <div className="col chat">
+      <main className="col chat">
         {loadError && <div className="error">{loadError}</div>}
         {state && activeId ? (
           <Chat
@@ -129,20 +135,31 @@ export default function Home() {
             onTurnEnd={onTurnEnd}
           />
         ) : (
-          <p className="muted" style={{ padding: 16 }}>Create or select a session to start.</p>
+          <div className="empty-state">
+            <span className="brand-mark large" aria-hidden="true" />
+            <p className="muted">Create or select a session to start.</p>
+          </div>
         )}
-      </div>
+      </main>
 
-      <div className="col">
+      <aside className="col inspector">
         {state && (
           <>
-            <WorkflowPanel state={state} />
-            <ToolCallLog state={state} />
-            <CompactionPanel state={state} />
+            <section className="panel">
+              <WorkflowPanel state={state} />
+            </section>
+            <section className="panel">
+              <ToolCallLog state={state} />
+            </section>
+            <section className="panel">
+              <CompactionPanel state={state} />
+            </section>
           </>
         )}
-        <MemoryPanel memories={memories} onSetStatus={(id, s) => void setMemoryStatus(id, s)} />
-      </div>
+        <section className="panel">
+          <MemoryPanel memories={memories} onSetStatus={(id, s) => void setMemoryStatus(id, s)} />
+        </section>
+      </aside>
     </div>
   );
 }

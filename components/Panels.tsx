@@ -15,7 +15,7 @@ export function SessionList(props: {
   return (
     <>
       <h3>Sessions</h3>
-      <button onClick={props.onNew} style={{ width: '100%', marginBottom: 8 }}>+ New session</button>
+      <button onClick={props.onNew} className="btn-primary new-session">+ New session</button>
       {props.sessions.map((s) => (
         // Two sibling buttons (a button can't contain another button).
         <div key={s.id} className="session-row">
@@ -42,7 +42,7 @@ export function ModelSelector(props: {
     <>
       <h3>Model</h3>
       <select
-        style={{ width: '100%' }}
+        className="model-select"
         value={`${props.provider}:${props.model}`}
         onChange={(e) => {
           const [provider, model] = e.target.value.split(':') as [Provider, string];
@@ -97,7 +97,7 @@ export function ToolCallLog({ state }: { state: SessionState }) {
           <summary>
             <span className={c.success ? 'ok' : 'fail'}>{c.success ? '✓' : '✗'}</span> <b>{c.toolName}</b>{' '}
             <span className="muted">{c.durationMs}ms · {new Date(c.createdAt).toLocaleTimeString()}</span>
-            {c.error && <div className="fail" style={{ fontSize: 12 }}>{c.error}</div>}
+            {c.error && <div className="fail call-error">{c.error}</div>}
           </summary>
           <pre>input: {JSON.stringify(c.input, null, 2)}</pre>
           <pre>result: {JSON.stringify(c.output, null, 2)}</pre>
@@ -136,12 +136,16 @@ export function MemoryPanel({ memories, onSetStatus }: { memories: Memory[]; onS
           <span className={`badge ${m.status === 'approved' ? 'complete' : m.status === 'proposed' ? 'executing' : ''}`}>{m.status}</span> {m.content}
           {m.reason && <div className="muted">why: {m.reason}</div>}
           {m.status === 'proposed' && (
-            <div style={{ marginTop: 4 }}>
-              <button onClick={() => onSetStatus(m.id, 'approved')}>Approve</button>{' '}
+            <div className="actions">
+              <button className="btn-primary" onClick={() => onSetStatus(m.id, 'approved')}>Approve</button>{' '}
               <button onClick={() => onSetStatus(m.id, 'rejected')}>Reject</button>
             </div>
           )}
-          {m.status === 'approved' && <button style={{ marginTop: 4 }} onClick={() => onSetStatus(m.id, 'rejected')}>Forget</button>}
+          {m.status === 'approved' && (
+            <div className="actions">
+              <button onClick={() => onSetStatus(m.id, 'rejected')}>Forget</button>
+            </div>
+          )}
         </div>
       ))}
     </>

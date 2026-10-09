@@ -60,7 +60,7 @@ export function Chat({ sessionId, initialMessages, provider, model, onTurnEnd }:
   return (
     <div className="chat">
       <div className="messages">
-        {messages.length === 0 && <p className="muted">Describe a goal, e.g. “Help me plan a 1-day team offsite.”</p>}
+        {messages.length === 0 && <p className="muted chat-hint">Describe a goal, e.g. “Help me plan a 1-day team offsite.”</p>}
         {messages.map((m) => (
           <div key={m.id} className={`msg ${m.role} ${compactedIds.has(m.id) ? 'compacted' : ''}`}>
             <div className="role">
@@ -70,7 +70,7 @@ export function Chat({ sessionId, initialMessages, provider, model, onTurnEnd }:
             {m.parts.map((p, i) => <Part key={i} part={p} markdown={m.role === 'assistant'} />)}
           </div>
         ))}
-        {busy && <p className="muted">Agent is working…</p>}
+        {busy && <p className="muted working">Agent is working</p>}
         <div ref={bottom} />
       </div>
       {error && <div className="error">Error: {error.message}</div>}
@@ -87,7 +87,13 @@ export function Chat({ sessionId, initialMessages, provider, model, onTurnEnd }:
             }
           }}
         />
-        {busy ? <button onClick={() => void stop()}>Stop</button> : <button onClick={submit} disabled={!input.trim()}>Send</button>}
+        {busy ? (
+          <button onClick={() => void stop()}>Stop</button>
+        ) : (
+          <button className="btn-primary" onClick={submit} disabled={!input.trim()}>
+            Send
+          </button>
+        )}
       </div>
     </div>
   );
